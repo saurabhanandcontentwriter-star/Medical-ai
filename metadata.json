@@ -1,0 +1,9 @@
+{
+  "name": "MedAssist AI",
+  "description": "A comprehensive AI-powered personal health assistant featuring symptom analysis, medical report explanation, and vital sign tracking using Google Gemini.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
