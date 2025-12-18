@@ -45,14 +45,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-5xl w-full flex flex-col md:flex-row min-h-[600px]">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-gray-900 p-4 transition-colors duration-200">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden max-w-5xl w-full flex flex-col md:flex-row min-h-[600px]">
         
         {/* Left Side - Brand/Visual */}
-        <div className="md:w-1/2 bg-teal-600 p-12 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="md:w-1/2 bg-teal-600 dark:bg-teal-700 p-12 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/medical-icons.png')] opacity-10"></div>
           <div className="relative z-10">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-teal-600 font-bold text-2xl mb-6">M</div>
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-teal-600 dark:text-teal-700 font-bold text-2xl mb-6">M</div>
             <h1 className="text-4xl font-bold mb-4">MedAssist AI</h1>
             <p className="text-teal-100 text-lg leading-relaxed">
               Your intelligent healthcare companion. Track vitals, analyze reports, find doctors, and manage prescriptions all in one place.
@@ -61,9 +61,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="relative z-10">
              <div className="flex items-center space-x-4 mb-4">
                <div className="flex -space-x-3">
-                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 bg-gray-200"></div>
-                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 bg-gray-300"></div>
-                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 bg-gray-400"></div>
+                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-gray-200"></div>
+                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-gray-300"></div>
+                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-gray-400"></div>
                </div>
                <p className="text-sm font-medium">Trusted by 10,000+ users</p>
              </div>
@@ -71,12 +71,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
 
         {/* Right Side - Form */}
-        <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white">
+        <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-gray-800">
           <div className="max-w-sm mx-auto w-full">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {isLogin ? 'Welcome Back' : 'Create Account'}
             </h2>
-            <p className="text-gray-500 mb-8">
+            <p className="text-gray-500 dark:text-gray-400 mb-8">
               {isLogin ? 'Enter your details to access your account.' : 'Sign up to start your health journey.'}
             </p>
 
@@ -84,7 +84,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <button 
               onClick={handleGoogleLogin}
               disabled={isLoading}
-              className="w-full flex items-center justify-center space-x-3 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl transition-all mb-6 group"
+              className="w-full flex items-center justify-center space-x-3 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-3 px-4 rounded-xl transition-all mb-6 group"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
@@ -102,46 +102,46 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </button>
 
             <div className="relative flex py-2 items-center mb-6">
-              <div className="flex-grow border-t border-gray-100"></div>
-              <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase tracking-wider">Or continue with email</span>
-              <div className="flex-grow border-t border-gray-100"></div>
+              <div className="flex-grow border-t border-gray-100 dark:border-gray-700"></div>
+              <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wider">Or continue with email</span>
+              <div className="flex-grow border-t border-gray-100 dark:border-gray-700"></div>
             </div>
 
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-transparent focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-gray-900 dark:text-white"
                     placeholder="John Doe"
                   />
                 </div>
               )}
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-transparent focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-gray-900 dark:text-white"
                   placeholder="name@example.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
                 <input
                   type="password"
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-transparent focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-gray-900 dark:text-white"
                   placeholder="••••••••"
                 />
               </div>
@@ -150,18 +150,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-teal-200"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-teal-200 dark:shadow-none"
                 >
                   {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
                 </button>
               </div>
             </form>
 
-            <p className="mt-8 text-center text-sm text-gray-600">
+            <p className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">
               {isLogin ? "Don't have an account? " : "Already have an account? "}
               <button 
                 onClick={() => setIsLogin(!isLogin)}
-                className="font-bold text-teal-600 hover:text-teal-700 transition-colors"
+                className="font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 transition-colors"
               >
                 {isLogin ? 'Sign up' : 'Log in'}
               </button>

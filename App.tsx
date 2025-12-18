@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import SymptomChat from './components/SymptomChat';
@@ -6,6 +7,9 @@ import ReportAnalyzer from './components/ReportAnalyzer';
 import DoctorFinder from './components/DoctorFinder';
 import MedicineOrder from './components/MedicineOrder';
 import LabTestBooking from './components/LabTestBooking';
+import HealthNews from './components/HealthNews';
+import HealthTips from './components/HealthTips';
+import YogaSessions from './components/YogaSessions';
 import Profile from './components/Profile';
 import OrderTracking from './components/OrderTracking';
 import AdminPanel from './components/AdminPanel';
@@ -19,6 +23,27 @@ function App() {
 
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
+  
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark' || 
+        (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
   
   // Centralized State for Notifications and Chat
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -116,7 +141,6 @@ function App() {
     const orderId = Math.floor(1000 + Math.random() * 9000).toString();
     const now = new Date();
 
-    // 1. Add Tracking Record
     const newOrder: OrderItem = {
       id: orderId,
       type: 'medicine',
@@ -139,23 +163,14 @@ function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-
-    // 2. Add Chat Message
     addChatMessage(`Your medicine order #${orderId} for ₹${amount} has been placed! You can track it in the 'Track Orders' section.`);
-    
-    // 3. Add In-App Notification
-    addNotification(
-      'Order Confirmed',
-      `Order #${orderId} containing: ${itemList}. Total: ₹${amount}`,
-      'order'
-    );
+    addNotification('Order Confirmed', `Order #${orderId} containing: ${itemList}. Total: ₹${amount}`, 'order');
   };
 
   const handleLabTestBookingComplete = (testName: string, date: string, amount: number) => {
     const orderId = Math.floor(5000 + Math.random() * 5000).toString();
     const now = new Date();
 
-    // 1. Add Tracking Record
     const newOrder: OrderItem = {
       id: orderId,
       type: 'lab_test',
@@ -178,16 +193,37 @@ function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-
-    // 2. Add Chat Message
     addChatMessage(`Your appointment for ${testName} is confirmed for ${date}. Booking ID: #${orderId}.`);
+    addNotification('Booking Confirmed', `Lab Test Booking #${orderId} for ${testName}. Date: ${date}.`, 'order');
+  };
 
-    // 3. Add In-App Notification
-    addNotification(
-      'Booking Confirmed',
-      `Lab Test Booking #${orderId} for ${testName}. Date: ${date}.`,
-      'order'
-    );
+  const handleDoctorAppointment = (doctorName: string, date: string, time: string, amount: number) => {
+    const orderId = Math.floor(1000 + Math.random() * 9000).toString();
+    const now = new Date();
+
+    const newOrder: OrderItem = {
+      id: orderId,
+      type: 'doctor_appointment',
+      title: `Appt: ${doctorName}`,
+      details: `Scheduled: ${date} at ${time}`,
+      amount: amount,
+      date: now,
+      status: 'Confirmed',
+      deliveryAgent: {
+         name: 'Clinic Staff',
+         phone: '+91 98765 43210'
+      },
+      invoiceUrl: `#invoice-${orderId}`,
+      steps: [
+        { label: 'Booked', timestamp: 'Just now', isCompleted: true },
+        { label: 'Confirmed', timestamp: 'Just now', isCompleted: true },
+        { label: 'Reminder Sent', isCompleted: false },
+        { label: 'Visit Completed', isCompleted: false },
+      ]
+    };
+    setOrders(prev => [newOrder, ...prev]);
+    addChatMessage(`Appointment confirmed with ${doctorName} on ${date} at ${time}.`);
+    addNotification('Appointment Booked', `Doctor: ${doctorName}, Date: ${date}`, 'order');
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -196,32 +232,29 @@ function App() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   };
 
-  // Render Login Screen if not authenticated
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50">
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors duration-200 text-gray-900 dark:text-gray-100">
       {/* Disclaimer Modal */}
       {showDisclaimer && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl">
-            <div className="w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-md w-full p-8 shadow-2xl transition-colors">
+            <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mb-4">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Medical Disclaimer</h2>
-            <p className="text-gray-600 mb-6 leading-relaxed">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Medical Disclaimer</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
               MedAssist AI is a demonstration tool. The information provided by this application is for educational purposes only and 
-              <strong className="text-gray-900"> does not constitute professional medical advice, diagnosis, or treatment.</strong>
+              <strong className="text-gray-900 dark:text-white"> does not constitute professional medical advice, diagnosis, or treatment.</strong>
               <br/><br/>
-              Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
-              <br/><br/>
-              <span className="text-rose-600 font-semibold">If you think you may have a medical emergency, call your doctor or emergency services immediately.</span>
+              <span className="text-rose-600 dark:text-rose-400 font-semibold">If you think you may have a medical emergency, call your doctor or emergency services immediately.</span>
             </p>
             <button 
               onClick={() => setShowDisclaimer(false)}
-              className="w-full bg-gray-900 text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 transition-colors"
+              className="w-full bg-gray-900 dark:bg-gray-700 text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
             >
               I Understand & Agree
             </button>
@@ -229,14 +262,14 @@ function App() {
         </div>
       )}
 
-      {/* Notification Bell (Fixed Top Right) */}
+      {/* Notification Bell */}
       <div className="fixed top-4 right-4 z-[60]">
         <button 
           onClick={() => {
             setIsNotificationOpen(!isNotificationOpen);
             if (!isNotificationOpen) markAllRead();
           }}
-          className="relative p-2.5 bg-white text-gray-600 rounded-full shadow-md hover:bg-gray-50 transition-all border border-gray-100"
+          className="relative p-2.5 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all border border-gray-100 dark:border-gray-700"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
           {unreadCount > 0 && (
@@ -248,10 +281,10 @@ function App() {
 
         {/* Notification Dropdown */}
         {isNotificationOpen && (
-          <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2">
-            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-              <h3 className="font-bold text-gray-900">Notifications</h3>
-              <span className="text-xs text-gray-500">{notifications.length} Total</span>
+          <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2">
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
+              <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{notifications.length} Total</span>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {notifications.length === 0 ? (
@@ -260,12 +293,12 @@ function App() {
                 </div>
               ) : (
                 notifications.map(notif => (
-                  <div key={notif.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}>
+                  <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/20'}`}>
                     <div className="flex gap-3">
                       <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'order' ? 'bg-green-500' : 'bg-teal-500'}`}></div>
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-800">{notif.title}</h4>
-                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">{notif.message}</p>
+                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{notif.title}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{notif.message}</p>
                         <p className="text-[10px] text-gray-400 mt-2">{notif.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                       </div>
                     </div>
@@ -278,25 +311,34 @@ function App() {
       </div>
 
       {/* Navigation */}
-      <Navigation currentView={currentView} setView={setCurrentView} onLogout={handleLogout} />
+      <Navigation 
+        currentView={currentView} 
+        setView={setCurrentView} 
+        onLogout={handleLogout} 
+        isDarkMode={isDarkMode}
+        toggleDarkMode={toggleDarkMode}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative">
-        {currentView === AppView.DASHBOARD && <Dashboard />}
+        {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} />}
         {currentView === AppView.CHAT && <SymptomChat />}
         {currentView === AppView.ANALYZER && <ReportAnalyzer />}
-        {currentView === AppView.DOCTOR_FINDER && <DoctorFinder />}
+        {currentView === AppView.DOCTOR_FINDER && <DoctorFinder onBookAppointment={handleDoctorAppointment} />}
         {currentView === AppView.ORDER_MEDICINE && (
           <MedicineOrder onOrderComplete={handleMedicineOrderComplete} />
         )}
         {currentView === AppView.BOOK_TEST && (
           <LabTestBooking onBookingComplete={handleLabTestBookingComplete} />
         )}
+        {currentView === AppView.HEALTH_NEWS && <HealthNews />}
+        {currentView === AppView.HEALTH_TIPS && <HealthTips />}
+        {currentView === AppView.YOGA && <YogaSessions />}
         {currentView === AppView.TRACKING && <OrderTracking orders={orders} />}
         {currentView === AppView.PROFILE && <Profile user={user} />}
         {currentView === AppView.ADMIN && <AdminPanel />}
 
-        {/* Floating Chatbot - Visible everywhere EXCEPT on the main Symptom Chat view */}
+        {/* Floating Chatbot */}
         {currentView !== AppView.CHAT && (
           <FloatingChatbot 
             messages={chatMessages} 

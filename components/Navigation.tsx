@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AppView } from '../types';
 
@@ -5,9 +6,11 @@ interface NavigationProps {
   currentView: AppView;
   setView: (view: AppView) => void;
   onLogout: () => void;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout }) => {
+const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout, isDarkMode, toggleDarkMode }) => {
   const navItems = [
     { id: AppView.DASHBOARD, label: 'Dashboard', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
@@ -27,6 +30,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout 
     { id: AppView.BOOK_TEST, label: 'Book Lab Test', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
     )},
+    { id: AppView.HEALTH_NEWS, label: 'Health News', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+    )},
+    { id: AppView.HEALTH_TIPS, label: 'Health Tips', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.674a1 1 0 00.951-.682l1.397-4.192H3.315l1.397 4.192a1 1 0 00.951.682h4.674zM12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+    )},
+    { id: AppView.YOGA, label: 'Yoga', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    )},
     { id: AppView.TRACKING, label: 'Track Orders', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
     )},
@@ -39,11 +51,11 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout 
   ];
 
   return (
-    <nav className="fixed bottom-0 w-full bg-white border-t border-gray-200 md:relative md:w-64 md:h-screen md:border-r md:border-t-0 z-50 overflow-y-auto scrollbar-hide flex flex-col justify-between">
+    <nav className="fixed bottom-0 w-full bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:relative md:w-64 md:h-screen md:border-r md:border-t-0 z-50 overflow-y-auto scrollbar-hide flex flex-col justify-between transition-colors duration-200">
       <div className="flex md:flex-col justify-around md:justify-start md:h-full md:p-4">
         <div className="hidden md:flex items-center space-x-2 mb-8 px-4">
           <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center text-white font-bold">M</div>
-          <span className="text-xl font-bold text-gray-800">MedAssist</span>
+          <span className="text-xl font-bold text-gray-800 dark:text-white">MedAssist</span>
         </div>
         
         <div className="flex md:flex-col justify-around md:space-y-1 w-full">
@@ -53,8 +65,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout 
               onClick={() => setView(item.id)}
               className={`flex flex-col md:flex-row items-center md:space-x-3 p-3 md:px-4 md:py-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
                 currentView === item.id
-                  ? 'text-teal-600 bg-teal-50 md:bg-teal-50'
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                  ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-gray-700/50'
+                  : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
               {item.icon}
@@ -64,11 +76,22 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout 
         </div>
       </div>
       
-      {/* Logout Button (Desktop only at bottom) */}
-      <div className="hidden md:block p-4 border-t border-gray-100">
+      <div className="hidden md:flex flex-col gap-2 p-4 border-t border-gray-100 dark:border-gray-700">
+        <button 
+          onClick={toggleDarkMode}
+          className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          {isDarkMode ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+          )}
+          <span className="text-sm font-medium">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
+
         <button 
           onClick={onLogout}
-          className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+          className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           <span className="text-sm font-medium">Log Out</span>

@@ -72,7 +72,10 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
     setCart(newCart);
   };
 
-  const totalAmount = cart.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
+  const gst = Math.round(subtotal * 0.12); // 12% GST
+  const platformFee = cart.length > 0 ? 15 : 0;
+  const totalAmount = subtotal + gst + platformFee;
 
   const handlePaymentSuccess = () => {
     setIsPaymentOpen(false);
@@ -98,12 +101,12 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
   });
 
   return (
-    <div className="flex flex-col h-full bg-white md:bg-gray-50 max-h-[calc(100vh-80px)] md:max-h-screen relative">
+    <div className="flex flex-col h-full bg-white md:bg-gray-50 dark:bg-gray-900 max-h-[calc(100vh-80px)] md:max-h-screen relative">
       <div className="p-6 pb-24 md:pb-6 max-w-6xl mx-auto w-full overflow-y-auto">
         <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Pharmacy & Wellness</h1>
-            <p className="text-gray-500">Order medicines, supplements, and health drinks.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pharmacy & Wellness</h1>
+            <p className="text-gray-500 dark:text-gray-400">Order medicines, supplements, and health drinks.</p>
           </div>
           <button 
             onClick={() => setShowCart(true)}
@@ -120,19 +123,19 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
         </header>
 
         {/* Search Bar */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 flex gap-2">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6 flex gap-2">
           <input 
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Search for medicines, drinks, supplements..."
-            className="flex-1 bg-gray-50 border-0 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-teal-500"
+            className="flex-1 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl px-4 py-3 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-teal-500"
           />
           <button 
             onClick={handleSearch}
             disabled={isLoading}
-            className="bg-gray-900 text-white px-6 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+            className="bg-gray-900 dark:bg-gray-700 text-white px-6 rounded-xl font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
           >
             {isLoading ? '...' : 'Search'}
           </button>
@@ -147,7 +150,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
               className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                 activeCategory === cat
                   ? 'bg-teal-600 text-white shadow-md'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
             >
               {cat}
@@ -158,24 +161,24 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
         {/* Product Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredMedicines.map((med, idx) => (
-            <div key={`${med.id}-${idx}`} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow flex flex-col h-full animate-in fade-in duration-300">
+            <div key={`${med.id}-${idx}`} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 hover:shadow-md transition-shadow flex flex-col h-full animate-in fade-in duration-300">
               <div className="flex justify-between items-start mb-3">
                 <span className={`text-xs px-2 py-1 rounded-lg font-medium ${
-                  med.category === 'Healthy Drinks' ? 'bg-orange-100 text-orange-700' :
-                  med.category === 'Supplements' ? 'bg-purple-100 text-purple-700' :
-                  'bg-teal-50 text-teal-700'
+                  med.category === 'Healthy Drinks' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
+                  med.category === 'Supplements' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                  'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
                 }`}>
                   {med.category || 'General'}
                 </span>
-                <span className="font-bold text-gray-900">₹{med.price}</span>
+                <span className="font-bold text-gray-900 dark:text-white">₹{med.price}</span>
               </div>
               <div className="flex-1 mb-4">
-                <h3 className="font-bold text-gray-800 text-lg mb-1">{med.name}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{med.description}</p>
+                <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg mb-1">{med.name}</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{med.description}</p>
               </div>
               <button 
                 onClick={() => addToCart(med)}
-                className="w-full py-2.5 rounded-xl border-2 border-teal-600 text-teal-600 font-medium hover:bg-teal-600 hover:text-white transition-all flex items-center justify-center"
+                className="w-full py-2.5 rounded-xl border-2 border-teal-600 text-teal-600 font-medium hover:bg-teal-600 hover:text-white transition-all flex items-center justify-center dark:hover:bg-teal-500 dark:border-teal-500 dark:text-teal-400 dark:hover:text-white"
               >
                 Add to Cart
               </button>
@@ -184,7 +187,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
         </div>
 
         {filteredMedicines.length === 0 && !isLoading && (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-gray-400 dark:text-gray-500">
             No items found in this category.
           </div>
         )}
@@ -193,29 +196,29 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
       {/* Cart Sidebar / Modal */}
       {showCart && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex justify-end">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl p-6 flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 h-full shadow-2xl p-6 flex flex-col animate-in slide-in-from-right duration-300">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Your Cart</h2>
-              <button onClick={() => setShowCart(false)} className="text-gray-400 hover:text-gray-600">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Cart</h2>
+              <button onClick={() => setShowCart(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-4">
               {cart.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
+                <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                   <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                   <p>Your cart is empty.</p>
                 </div>
               ) : (
                 cart.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                  <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
                     <div>
-                      <h4 className="font-semibold text-gray-800">{item.name}</h4>
-                      <p className="text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded inline-block mt-1">{item.category}</p>
+                      <h4 className="font-semibold text-gray-800 dark:text-gray-200">{item.name}</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded inline-block mt-1">{item.category}</p>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <span className="font-medium">₹{item.price}</span>
+                      <span className="font-medium text-gray-900 dark:text-white">₹{item.price}</span>
                       <button onClick={() => removeFromCart(idx)} className="text-red-400 hover:text-red-600 p-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -225,14 +228,26 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
               )}
             </div>
 
-            <div className="border-t border-gray-100 pt-4 mt-4">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-600">Total Amount</span>
-                <span className="text-2xl font-bold text-gray-900">₹{totalAmount}</span>
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mt-4 space-y-2">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>Subtotal</span>
+                <span>₹{subtotal}</span>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>GST (12%)</span>
+                <span>₹{gst}</span>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                <span>Platform Fee</span>
+                <span>₹{platformFee}</span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-700">
+                <span className="font-bold text-gray-900 dark:text-white">Total Amount</span>
+                <span className="text-2xl font-bold text-teal-600 dark:text-teal-400">₹{totalAmount}</span>
               </div>
               <button 
                 disabled={cart.length === 0}
-                className="w-full bg-teal-600 text-white py-3.5 rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed shadow-lg shadow-teal-200"
+                className="w-full bg-teal-600 text-white py-3.5 rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed shadow-lg shadow-teal-200 dark:shadow-none mt-4"
                 onClick={() => setIsPaymentOpen(true)}
               >
                 Checkout Now

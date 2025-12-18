@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import { Message, Sender, DoctorSearchResult, Medicine, LabTest } from "../types";
+import { Message, Sender, DoctorSearchResult, Medicine, LabTest, HealthNewsItem, HealthTip, YogaSession } from "../types";
 
 // Initialize the client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -20,8 +21,6 @@ export const sendMessageToGemini = async (
   newMessage: string
 ): Promise<string> => {
   try {
-    // Convert app history to Gemini format (simplistic approach for context)
-    // We strictly use the last few messages to keep context relevant and save tokens
     const recentHistory = history.slice(-10).map(msg => 
       `${msg.sender === Sender.USER ? 'User' : 'Model'}: ${msg.text}`
     ).join('\n');
@@ -29,7 +28,7 @@ export const sendMessageToGemini = async (
     const prompt = `${recentHistory}\nUser: ${newMessage}\nModel:`;
 
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -50,7 +49,7 @@ export const analyzeMedicalImage = async (
 ): Promise<string> => {
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           {
@@ -81,13 +80,12 @@ export const searchDoctors = async (
   specialty: string
 ): Promise<DoctorSearchResult> => {
   try {
-    // We ask for a structured format within the text to attempt extraction of coordinates
     const prompt = `Find top rated ${specialty}s or hospitals in ${district}, Bihar, India. 
     1. Provide a helpful summary of the best options available.
     2. IMPORTANT: For each place, if you know the location, strictly include a hidden tag in this exact format: [[Name | Lat, Lng]] (e.g., [[AIIMS Patna | 25.556, 85.074]]). This allows us to place them on a map.`;
     
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         tools: [{ googleMaps: {} }],
@@ -97,13 +95,11 @@ export const searchDoctors = async (
 
     const text = response.text || "No details found.";
     
-    // Parse coordinates from text if available
     const coordsMap = new Map<string, {lat: number, lng: number}>();
     const coordinateRegex = /\[\[(.*?)\s*\|\s*([\d.-]+),\s*([\d.-]+)\]\]/g;
     let match;
     while ((match = coordinateRegex.exec(text)) !== null) {
-      // Normalize name for matching
-      const nameKey = match[1].trim().toLowerCase().substring(0, 15); // Use first 15 chars for fuzzy matching
+      const nameKey = match[1].trim().toLowerCase().substring(0, 15);
       const lat = parseFloat(match[2]);
       const lng = parseFloat(match[3]);
       if (!isNaN(lat) && !isNaN(lng)) {
@@ -111,32 +107,24 @@ export const searchDoctors = async (
       }
     }
 
-    // Extract map links and merge with coordinates
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const places = groundingChunks
       .filter((chunk: any) => chunk.maps?.uri && chunk.maps?.title)
       .map((chunk: any) => {
         const title = chunk.maps.title;
         const uri = chunk.maps.uri;
-        
-        // Attempt to find coordinates for this place
         const titleKey = title.toLowerCase().substring(0, 15);
         let location = undefined;
-        
-        // Try exact substring match keys
         for (const [key, coords] of coordsMap.entries()) {
           if (titleKey.includes(key) || key.includes(titleKey)) {
             location = coords;
             break;
           }
         }
-
         return { title, uri, location };
       });
 
-    // Clean up the text by removing the coord tags for display
     const cleanText = text.replace(/\[\[.*?\]\]/g, '');
-
     return { text: cleanText, places };
   } catch (error) {
     console.error("Error searching doctors:", error);
@@ -150,7 +138,7 @@ export const searchDoctors = async (
 export const searchMedicines = async (query: string): Promise<Medicine[]> => {
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `List 5 popular brands or types of medicine, health drinks, or supplements available in India for: ${query}. 
       Return structured JSON data.
       Include a realistic price in INR.
@@ -184,7 +172,7 @@ export const searchMedicines = async (query: string): Promise<Medicine[]> => {
 export const searchLabTests = async (query: string): Promise<LabTest[]> => {
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `List 5 common diagnostic lab tests related to: ${query}. 
       Return structured JSON data. 
       Include a realistic price in INR and preparation instructions.`,
@@ -210,6 +198,102 @@ export const searchLabTests = async (query: string): Promise<LabTest[]> => {
     return text ? JSON.parse(text) : [];
   } catch (error) {
     console.error("Error searching lab tests:", error);
+    return [];
+  }
+};
+
+export const fetchHealthNews = async (language: 'English' | 'Hindi' = 'English'): Promise<HealthNewsItem[]> => {
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Get the latest health and medical news updates from India and around the world from today. 
+      IMPORTANT: All text fields (title, summary, category, source) MUST be in ${language}.
+      Provide 6-8 news items as structured JSON.`,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              summary: { type: Type.STRING },
+              source: { type: Type.STRING },
+              url: { type: Type.STRING },
+              date: { type: Type.STRING },
+              category: { type: Type.STRING }
+            },
+            required: ['id', 'title', 'summary', 'source', 'url', 'date', 'category']
+          }
+        }
+      }
+    });
+
+    const text = response.text;
+    return text ? JSON.parse(text) : [];
+  } catch (error) {
+    console.error("Error fetching health news:", error);
+    return [];
+  }
+};
+
+export const fetchHealthTips = async (): Promise<HealthTip[]> => {
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: "Generate 6 unique health tips for today. Categories: 'Nutrition', 'Lifestyle', 'Mental Health', 'Exercise'. Return as JSON.",
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              category: { type: Type.STRING },
+              icon: { type: Type.STRING }
+            }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
+
+export const fetchYogaSessions = async (): Promise<YogaSession[]> => {
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: "Generate 4 structured yoga sessions. Return as JSON.",
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              duration: { type: Type.STRING },
+              level: { type: Type.STRING },
+              focus: { type: Type.STRING },
+              poses: { type: Type.ARRAY, items: { type: Type.STRING } }
+            }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error(error);
     return [];
   }
 };

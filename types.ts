@@ -1,3 +1,4 @@
+
 export enum Sender {
   USER = 'user',
   BOT = 'bot',
@@ -35,6 +36,9 @@ export enum AppView {
   DOCTOR_FINDER = 'DOCTOR_FINDER',
   ORDER_MEDICINE = 'ORDER_MEDICINE',
   BOOK_TEST = 'BOOK_TEST',
+  HEALTH_NEWS = 'HEALTH_NEWS',
+  HEALTH_TIPS = 'HEALTH_TIPS',
+  YOGA = 'YOGA',
   TRACKING = 'TRACKING',
   PROFILE = 'PROFILE',
   ADMIN = 'ADMIN'
@@ -90,7 +94,7 @@ export interface DeliveryAgent {
 
 export interface OrderItem {
   id: string;
-  type: 'medicine' | 'lab_test';
+  type: 'medicine' | 'lab_test' | 'doctor_appointment';
   title: string;
   details: string; // comma separated items
   amount: number;
@@ -106,4 +110,31 @@ export interface UserProfile {
   name: string;
   email: string;
   avatar?: string;
+}
+
+export interface HealthNewsItem {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  date: string;
+  category: string;
+}
+
+export interface HealthTip {
+  id: string;
+  title: string;
+  description: string;
+  category: 'Nutrition' | 'Lifestyle' | 'Mental Health' | 'Exercise';
+  icon: string;
+}
+
+export interface YogaSession {
+  id: string;
+  title: string;
+  duration: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  focus: string;
+  poses: string[];
 }

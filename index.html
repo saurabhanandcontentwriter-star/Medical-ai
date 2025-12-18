@@ -5,12 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MedAssist AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              // You can extend colors here if needed
+            }
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <style>
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
       }
       /* Custom scrollbar for chat */
       .scrollbar-hide::-webkit-scrollbar {
@@ -39,7 +50,7 @@
 }
 </script>
 </head>
-  <body>
+  <body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
     <div id="root"></div>
   </body>
 </html>

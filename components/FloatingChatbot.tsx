@@ -83,7 +83,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-36 md:bottom-24 right-4 md:right-8 w-[calc(100vw-2rem)] md:w-96 h-[500px] max-h-[60vh] md:max-h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+        <div className="fixed bottom-36 md:bottom-24 right-4 md:right-8 w-[calc(100vw-2rem)] md:w-96 h-[500px] max-h-[60vh] md:max-h-[500px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
            {/* Header */}
            <div className="p-4 bg-teal-600 text-white flex justify-between items-center shadow-sm">
              <div className="flex items-center space-x-2">
@@ -98,13 +98,13 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
            </div>
 
            {/* Messages Area */}
-           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-gray-900">
              {messages.map(msg => (
                <div key={msg.id} className={`flex ${msg.sender === Sender.USER ? 'justify-end' : 'justify-start'}`}>
                  <div className={`max-w-[85%] p-3 rounded-xl text-sm leading-relaxed ${
                    msg.sender === Sender.USER 
                      ? 'bg-teal-600 text-white rounded-tr-none shadow-sm' 
-                     : 'bg-white text-gray-700 shadow-sm border border-gray-100 rounded-tl-none'
+                     : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
                  }`}>
                    {msg.text}
                  </div>
@@ -112,7 +112,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
              ))}
              {isLoading && (
                <div className="flex justify-start">
-                 <div className="bg-white p-3 rounded-xl rounded-tl-none shadow-sm border border-gray-100 flex space-x-1.5 items-center">
+                 <div className="bg-white dark:bg-gray-800 p-3 rounded-xl rounded-tl-none shadow-sm border border-gray-100 dark:border-gray-700 flex space-x-1.5 items-center">
                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-100"></div>
                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-200"></div>
@@ -123,15 +123,15 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
            </div>
 
            {/* Input Area */}
-           <div className="p-3 bg-white border-t border-gray-100">
-             <div className="flex items-center space-x-2 bg-gray-100 rounded-xl p-1 pr-2">
+           <div className="p-3 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
+             <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 pr-2">
                <input 
                  type="text" 
                  value={input}
                  onChange={e => setInput(e.target.value)}
                  onKeyDown={e => e.key === 'Enter' && handleSend()}
                  placeholder="Ask anything..."
-                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-3 py-2 text-gray-700 placeholder-gray-400"
+                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-3 py-2 text-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                  autoFocus
                />
                <button 
@@ -139,7 +139,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
                  disabled={!input.trim() || isLoading}
                  className={`p-2 rounded-lg transition-colors ${
                    !input.trim() || isLoading 
-                     ? 'bg-gray-200 text-gray-400' 
+                     ? 'bg-gray-200 dark:bg-gray-600 text-gray-400 dark:text-gray-500' 
                      : 'bg-teal-600 text-white hover:bg-teal-700'
                  }`}
                >
