@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 
@@ -61,30 +62,40 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="relative z-10">
              <div className="flex items-center space-x-4 mb-4">
                <div className="flex -space-x-3">
-                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-gray-200"></div>
-                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-gray-300"></div>
-                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-gray-400"></div>
+                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-xs">R</div>
+                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-xs">P</div>
+                 <div className="w-10 h-10 rounded-full border-2 border-teal-600 dark:border-teal-700 bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-xs">S</div>
                </div>
-               <p className="text-sm font-medium">Trusted by 10,000+ users</p>
+               <p className="text-sm font-medium text-teal-50">Trusted by 10,000+ users</p>
              </div>
           </div>
         </div>
 
         {/* Right Side - Form */}
         <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-gray-800">
-          <div className="max-w-sm mx-auto w-full">
+          <div className="max-w-sm mx-auto w-full text-center">
+            
+            {/* Styled Avatar Placeholder from Screenshot */}
+            <div className="flex justify-center mb-6">
+              <div className="w-24 h-24 rounded-full bg-[#d1fae5] dark:bg-teal-900/40 flex items-center justify-center border-4 border-white dark:border-gray-700 shadow-md">
+                <span className="text-3xl font-black text-[#0d9488] dark:text-teal-400">
+                  {isLogin ? 'R' : (formData.name ? formData.name.charAt(0).toUpperCase() : '?')}
+                </span>
+              </div>
+            </div>
+
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
+              {isLogin ? 'Rahul Sharma' : 'Create Account'}
             </h2>
             <p className="text-gray-500 dark:text-gray-400 mb-8">
-              {isLogin ? 'Enter your details to access your account.' : 'Sign up to start your health journey.'}
+              {isLogin ? 'rahul.sharma@gmail.com' : 'Sign up to start your health journey.'}
             </p>
 
             {/* Google Button */}
             <button 
               onClick={handleGoogleLogin}
               disabled={isLoading}
-              className="w-full flex items-center justify-center space-x-3 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-3 px-4 rounded-xl transition-all mb-6 group"
+              className="w-full flex items-center justify-center space-x-3 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-3 px-4 rounded-xl transition-all mb-6 group shadow-sm"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
@@ -103,14 +114,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             <div className="relative flex py-2 items-center mb-6">
               <div className="flex-grow border-t border-gray-100 dark:border-gray-700"></div>
-              <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-xs uppercase tracking-wider">Or continue with email</span>
+              <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-[10px] uppercase tracking-widest font-bold">Or continue with email</span>
               <div className="flex-grow border-t border-gray-100 dark:border-gray-700"></div>
             </div>
 
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <form onSubmit={handleEmailSubmit} className="space-y-4 text-left">
               {!isLogin && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1 uppercase tracking-wider">Full Name</label>
                   <input
                     type="text"
                     required
@@ -123,7 +134,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               )}
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email Address</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1 uppercase tracking-wider">Email Address</label>
                 <input
                   type="email"
                   required
@@ -135,7 +146,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1 uppercase tracking-wider">Password</label>
                 <input
                   type="password"
                   required
@@ -150,7 +161,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-teal-200 dark:shadow-none"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg shadow-teal-200 dark:shadow-none"
                 >
                   {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
                 </button>

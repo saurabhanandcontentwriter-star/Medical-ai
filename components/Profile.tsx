@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile } from '../types';
 
 interface ProfileProps {
@@ -7,11 +8,12 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Default data structure
   const defaultProfile = {
     name: 'Rahul Sharma',
-    email: 'rahul.sharma@example.com',
+    email: 'rahul.sharma@gmail.com',
     phone: '+91 98765 43210',
     dob: '1995-08-15',
     gender: 'Male',
@@ -22,7 +24,8 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     allergies: 'Peanuts, Dust Mites',
     conditions: 'Mild Asthma',
     emergencyContactName: 'Priya Sharma',
-    emergencyContactPhone: '+91 98765 43211'
+    emergencyContactPhone: '+91 98765 43211',
+    avatarUrl: ''
   };
 
   const [formData, setFormData] = useState(defaultProfile);
@@ -33,23 +36,39 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
       setFormData(prev => ({
         ...prev,
         name: user.name,
-        email: user.email
+        email: user.email,
+        avatarUrl: user.avatar && user.avatar.length > 1 ? user.avatar : prev.avatarUrl
       }));
     }
   }, [user]);
 
   const handleSave = () => {
     setIsEditing(false);
-    // In a real app, we would save to backend here
   };
 
   const handleCancel = () => {
-    // Reset to what it was before editing (simplified here by just closing)
     setIsEditing(false);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleAvatarClick = () => {
+    if (isEditing) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, avatarUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -90,12 +109,22 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
         {/* Left Column - ID Card Style */}
         <div className="md:col-span-1">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col items-center text-center">
-            <div className="w-32 h-32 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-4xl mb-4 border-4 border-white dark:border-gray-700 shadow-md overflow-hidden">
-               {user?.avatar && user.avatar.length === 1 ? (
-                 <span className="text-teal-600 dark:text-teal-400 font-bold">{user.avatar}</span>
+            <div 
+              onClick={handleAvatarClick}
+              className={`group relative w-32 h-32 rounded-full flex items-center justify-center text-4xl mb-4 border-4 border-white dark:border-gray-700 shadow-md overflow-hidden transition-all ${isEditing ? 'cursor-pointer hover:ring-4 hover:ring-teal-200 ring-offset-2' : ''} ${!formData.avatarUrl ? 'bg-[#d1fae5] dark:bg-teal-900/40' : ''}`}
+            >
+               {formData.avatarUrl ? (
+                 <img src={formData.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                ) : (
-                 <span className="text-teal-600 dark:text-teal-400 font-bold">{formData.name.charAt(0)}</span>
+                 <span className="text-[#0d9488] dark:text-teal-400 font-black">{formData.name.charAt(0)}</span>
                )}
+               
+               {isEditing && (
+                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                 </div>
+               )}
+               <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{formData.name}</h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">{formData.email}</p>
@@ -137,7 +166,7 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
         {/* Right Column - Details Form */}
         <div className="md:col-span-2 space-y-6">
-          
+          {/* ... (rest of the file remains the same) */}
           {/* Personal Information */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-50 dark:border-gray-700">Personal Information</h3>
@@ -185,7 +214,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             </div>
           </div>
 
-          {/* Physical Attributes */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-50 dark:border-gray-700">Physical Attributes</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -230,7 +258,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             </div>
           </div>
 
-          {/* Medical History */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-50 dark:border-gray-700">Medical History</h3>
             <div className="grid grid-cols-1 gap-4">
@@ -264,7 +291,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

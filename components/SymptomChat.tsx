@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Sender } from '../types';
-import { sendMessageToGemini } from '../services/geminiService';
+import { sendMessageToGemini, generateSpeech, decodeAudioData } from '../services/geminiService';
 
 const SymptomChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -13,7 +14,10 @@ const SymptomChat: React.FC = () => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
+  const [voiceLanguage, setVoiceLanguage] = useState<'English' | 'Hindi'>('English');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,6 +58,32 @@ const SymptomChat: React.FC = () => {
     }
   };
 
+  const playVoice = async (id: string, text: string) => {
+    if (isSpeaking) return;
+    setIsSpeaking(id);
+
+    try {
+      const audioData = await generateSpeech(text, voiceLanguage);
+      if (audioData) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        const ctx = audioContextRef.current;
+        const audioBuffer = await decodeAudioData(audioData, ctx, 24000, 1);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.onended = () => setIsSpeaking(null);
+        source.start();
+      } else {
+        setIsSpeaking(null);
+      }
+    } catch (e) {
+      console.error("Audio playback error", e);
+      setIsSpeaking(null);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -63,9 +93,21 @@ const SymptomChat: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-white md:bg-gray-50 dark:bg-gray-900 max-h-[calc(100vh-80px)] md:max-h-screen">
-      <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 md:bg-transparent md:border-none md:pt-6 md:px-6">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-white">Symptom Checker</h1>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">AI-powered analysis. Not a substitute for professional advice.</p>
+      <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 md:bg-transparent md:border-none md:pt-6 md:px-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Symptom Checker</h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">AI-powered analysis. Not a substitute for professional advice.</p>
+        </div>
+        <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+           <button 
+             onClick={() => setVoiceLanguage('English')}
+             className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${voiceLanguage === 'English' ? 'bg-teal-600 text-white' : 'text-gray-500'}`}
+           >EN</button>
+           <button 
+             onClick={() => setVoiceLanguage('Hindi')}
+             className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${voiceLanguage === 'Hindi' ? 'bg-teal-600 text-white' : 'text-gray-500'}`}
+           >HI</button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20 md:pb-4 scrollbar-hide">
@@ -75,15 +117,26 @@ const SymptomChat: React.FC = () => {
             className={`flex ${msg.sender === Sender.USER ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] md:max-w-[70%] p-3 rounded-2xl text-sm md:text-base leading-relaxed whitespace-pre-wrap ${
+              className={`max-w-[85%] md:max-w-[70%] p-3 rounded-2xl text-sm md:text-base leading-relaxed whitespace-pre-wrap relative group ${
                 msg.sender === Sender.USER
                   ? 'bg-teal-600 text-white rounded-tr-none'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
               }`}
             >
               {msg.text}
-              <div className={`text-[10px] mt-2 opacity-70 ${msg.sender === Sender.USER ? 'text-teal-100' : 'text-gray-400 dark:text-gray-500'}`}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <div className="flex justify-between items-center mt-2">
+                <div className={`text-[10px] opacity-70 ${msg.sender === Sender.USER ? 'text-teal-100' : 'text-gray-400 dark:text-gray-500'}`}>
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                {msg.sender === Sender.BOT && (
+                  <button 
+                    onClick={() => playVoice(msg.id, msg.text)}
+                    disabled={!!isSpeaking}
+                    className={`p-1 rounded-full hover:bg-teal-50 dark:hover:bg-teal-900/30 transition-colors ${isSpeaking === msg.id ? 'text-teal-500 animate-pulse' : 'text-gray-400'}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                  </button>
+                )}
               </div>
             </div>
           </div>

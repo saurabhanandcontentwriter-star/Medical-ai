@@ -1,9 +1,6 @@
 
-import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type, Modality } from "@google/genai";
 import { Message, Sender, DoctorSearchResult, Medicine, LabTest, HealthNewsItem, HealthTip, YogaSession } from "../types";
-
-// Initialize the client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION = `
 You are MedAssist, a supportive and knowledgeable medical AI assistant. 
@@ -21,6 +18,7 @@ export const sendMessageToGemini = async (
   newMessage: string
 ): Promise<string> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const recentHistory = history.slice(-10).map(msg => 
       `${msg.sender === Sender.USER ? 'User' : 'Model'}: ${msg.text}`
     ).join('\n');
@@ -42,12 +40,74 @@ export const sendMessageToGemini = async (
   }
 };
 
+export const generateSpeech = async (text: string, language: 'English' | 'Hindi' = 'English'): Promise<Uint8Array | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = language === 'Hindi' 
+      ? `हिंदी में बोलें: ${text}` 
+      : `Say clearly: ${text}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: language === 'Hindi' ? 'Puck' : 'Kore' },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (base64Audio) {
+      return decode(base64Audio);
+    }
+    return null;
+  } catch (error) {
+    console.error("Error generating speech:", error);
+    return null;
+  }
+};
+
+// Audio Decoding Helper Functions
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
 export const analyzeMedicalImage = async (
   base64Image: string,
   mimeType: string,
   userPrompt: string
 ): Promise<string> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
@@ -80,15 +140,16 @@ export const searchDoctors = async (
   specialty: string
 ): Promise<DoctorSearchResult> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Find top rated ${specialty}s or hospitals in ${district}, Bihar, India. 
     1. Provide a helpful summary of the best options available.
     2. IMPORTANT: For each place, if you know the location, strictly include a hidden tag in this exact format: [[Name | Lat, Lng]] (e.g., [[AIIMS Patna | 25.556, 85.074]]). This allows us to place them on a map.`;
     
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        tools: [{ googleMaps: {} }],
+        tools: [{ googleSearch: {} }],
         systemInstruction: "You are a helpful medical assistant. When asked to find doctors, use Google Maps to find real places.",
       }
     });
@@ -126,23 +187,22 @@ export const searchDoctors = async (
 
     const cleanText = text.replace(/\[\[.*?\]\]/g, '');
     return { text: cleanText, places };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error searching doctors:", error);
-    return { 
-      text: "I apologize, but I couldn't connect to the location service right now. Please try again later.", 
-      places: [] 
-    };
+    throw error;
   }
 };
 
 export const searchMedicines = async (query: string): Promise<Medicine[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `List 5 popular brands or types of medicine, health drinks, or supplements available in India for: ${query}. 
+      contents: `List 5 popular brands or types of medicine, soaps, health drinks, or supplements available in India for: ${query}. 
+      Include treatments for skin/face problems, hair issues, or dental care if relevant.
       Return structured JSON data.
       Include a realistic price in INR.
-      Category should be one of: 'General', 'Supplements', 'Healthy Drinks', 'Allergy', 'Digestion', 'Pain Relief', 'First Aid'.`,
+      Category MUST be one of: 'Medicines', 'Supplements', 'Hygiene', 'Skin & Face', 'Hair Care', 'Dental'.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -171,6 +231,7 @@ export const searchMedicines = async (query: string): Promise<Medicine[]> => {
 
 export const searchLabTests = async (query: string): Promise<LabTest[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `List 5 common diagnostic lab tests related to: ${query}. 
@@ -204,6 +265,7 @@ export const searchLabTests = async (query: string): Promise<LabTest[]> => {
 
 export const fetchHealthNews = async (language: 'English' | 'Hindi' = 'English'): Promise<HealthNewsItem[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Get the latest health and medical news updates from India and around the world from today. 
@@ -241,6 +303,7 @@ export const fetchHealthNews = async (language: 'English' | 'Hindi' = 'English')
 
 export const fetchHealthTips = async (): Promise<HealthTip[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: "Generate 6 unique health tips for today. Categories: 'Nutrition', 'Lifestyle', 'Mental Health', 'Exercise'. Return as JSON.",
@@ -270,6 +333,7 @@ export const fetchHealthTips = async (): Promise<HealthTip[]> => {
 
 export const fetchYogaSessions = async (): Promise<YogaSession[]> => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: "Generate 4 structured yoga sessions. Return as JSON.",

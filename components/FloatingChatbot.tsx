@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Sender } from '../types';
-import { sendMessageToGemini } from '../services/geminiService';
+import { sendMessageToGemini, generateSpeech, decodeAudioData } from '../services/geminiService';
 
 interface FloatingChatbotProps {
   messages: Message[];
@@ -11,25 +12,16 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
+  const [voiceLanguage, setVoiceLanguage] = useState<'English' | 'Hindi'>('English');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen]);
-
-  // Auto-open chatbot if a new system message arrives and chat is closed
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      // If the last message is from the system (like an order confirmation), open the chat slightly
-      if (lastMsg.sender === Sender.BOT && !isOpen) {
-        // We can optionally set setIsOpen(true) here if we want to force open
-        // For now, we'll just let the badge (if we added one) or user handle it
-      }
-    }
-  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -66,6 +58,32 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
     }
   };
 
+  const playVoice = async (id: string, text: string) => {
+    if (isSpeaking) return;
+    setIsSpeaking(id);
+
+    try {
+      const audioData = await generateSpeech(text, voiceLanguage);
+      if (audioData) {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        const ctx = audioContextRef.current;
+        const audioBuffer = await decodeAudioData(audioData, ctx, 24000, 1);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        source.onended = () => setIsSpeaking(null);
+        source.start();
+      } else {
+        setIsSpeaking(null);
+      }
+    } catch (e) {
+      console.error("Audio playback error", e);
+      setIsSpeaking(null);
+    }
+  };
+
   return (
     <>
       {/* Toggle Button (FAB) */}
@@ -92,21 +110,37 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
                  <h3 className="font-bold text-sm">MedAssist Assistant</h3>
                </div>
              </div>
-             <button onClick={() => setIsOpen(false)} className="text-teal-100 hover:text-white">
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-             </button>
+             <div className="flex items-center space-x-2">
+                <div className="flex bg-white/20 p-0.5 rounded-lg text-[10px]">
+                  <button onClick={() => setVoiceLanguage('English')} className={`px-2 py-0.5 rounded ${voiceLanguage === 'English' ? 'bg-white text-teal-700' : 'text-white'}`}>EN</button>
+                  <button onClick={() => setVoiceLanguage('Hindi')} className={`px-2 py-0.5 rounded ${voiceLanguage === 'Hindi' ? 'bg-white text-teal-700' : 'text-white'}`}>HI</button>
+                </div>
+                <button onClick={() => setIsOpen(false)} className="text-teal-100 hover:text-white">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+             </div>
            </div>
 
            {/* Messages Area */}
            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-gray-900">
              {messages.map(msg => (
                <div key={msg.id} className={`flex ${msg.sender === Sender.USER ? 'justify-end' : 'justify-start'}`}>
-                 <div className={`max-w-[85%] p-3 rounded-xl text-sm leading-relaxed ${
+                 <div className={`max-w-[85%] p-3 rounded-xl text-sm leading-relaxed relative group ${
                    msg.sender === Sender.USER 
                      ? 'bg-teal-600 text-white rounded-tr-none shadow-sm' 
                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-sm border border-gray-100 dark:border-gray-700 rounded-tl-none'
                  }`}>
                    {msg.text}
+                   {msg.sender === Sender.BOT && (
+                     <button 
+                       onClick={() => playVoice(msg.id, msg.text)}
+                       disabled={!!isSpeaking}
+                       className={`mt-2 flex items-center space-x-1 text-[10px] font-bold transition-colors ${isSpeaking === msg.id ? 'text-teal-500 animate-pulse' : 'text-gray-400 hover:text-teal-500'}`}
+                     >
+                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                       <span>{isSpeaking === msg.id ? 'Speaking...' : 'Listen'}</span>
+                     </button>
+                   )}
                  </div>
                </div>
              ))}
@@ -132,7 +166,6 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
                  onKeyDown={e => e.key === 'Enter' && handleSend()}
                  placeholder="Ask anything..."
                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-3 py-2 text-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                 autoFocus
                />
                <button 
                  onClick={handleSend}

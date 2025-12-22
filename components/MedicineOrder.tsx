@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { searchMedicines } from '../services/geminiService';
 import { Medicine } from '../types';
@@ -18,29 +19,44 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
   // Payment State
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
-  const categories = ['All', 'Medicines', 'Supplements', 'Healthy Drinks'];
+  const categories = ['All', 'Medicines', 'Skin & Face', 'Hair Care', 'Dental', 'Hygiene', 'Supplements'];
 
-  // Expanded Default suggestions
+  // Expanded Default suggestions with soaps, handwashes, and problem-specific treatments
   const defaultMedicines: Medicine[] = [
     // Medicines
-    { id: '1', name: 'Paracetamol 650mg', description: 'Fever and mild pain relief', price: 30, category: 'General' },
-    { id: '3', name: 'Cetirizine 10mg', description: 'Allergy relief', price: 45, category: 'Allergy' },
-    { id: '4', name: 'Digene Gel', description: 'Antacid for acidity relief', price: 180, category: 'Digestion' },
-    { id: '6', name: 'Volini Spray', description: 'Pain relief spray for muscles', price: 210, category: 'Pain Relief' },
+    { id: '1', name: 'Paracetamol 650mg', description: 'Fever and mild pain relief', price: 30, category: 'Medicines' },
+    { id: '3', name: 'Cetirizine 10mg', description: 'Allergy relief', price: 45, category: 'Medicines' },
+    { id: '4', name: 'Digene Gel', description: 'Antacid for acidity relief', price: 180, category: 'Medicines' },
+    { id: '6', name: 'Volini Spray', description: 'Pain relief spray for muscles', price: 210, category: 'Medicines' },
+    
+    // Skin & Face
+    { id: 'f1', name: 'Salicylic Acid Face Wash', description: 'Treats active acne and prevents breakouts', price: 349, category: 'Skin & Face' },
+    { id: 'f2', name: 'Acne Clarifying Gel', description: 'Spot treatment for pimples and blemishes', price: 275, category: 'Skin & Face' },
+    { id: 'f3', name: 'SPF 50 Sunscreen', description: 'Ultra-light matte finish sun protection', price: 499, category: 'Skin & Face' },
+    { id: 'f4', name: 'Sulphur Medicated Soap', description: 'For fungal infections and skin issues', price: 95, category: 'Skin & Face' },
+    
+    // Hair Care
+    { id: 'h1', name: 'Ketoconazole Shampoo', description: 'Clinically proven anti-dandruff solution', price: 320, category: 'Hair Care' },
+    { id: 'h2', name: 'Biotin Hair Serum', description: 'Strengthens hair roots and reduces hair fall', price: 650, category: 'Hair Care' },
+    { id: 'h3', name: 'Minoxidil Solution 5%', description: 'Medical treatment for hair regrowth', price: 850, category: 'Hair Care' },
+    { id: 'h4', name: 'Onion Hair Oil', description: 'Natural hair nourishment and shine', price: 399, category: 'Hair Care' },
+
+    // Dental
+    { id: 't1', name: 'Sensitivity Toothpaste', description: 'Rapid relief for sensitive teeth and gums', price: 185, category: 'Dental' },
+    { id: 't2', name: 'Antiseptic Mouthwash', description: 'Kills 99% of germs, prevents plaque', price: 220, category: 'Dental' },
+    { id: 't3', name: 'Gum Care Gel', description: 'Relief from bleeding and inflamed gums', price: 140, category: 'Dental' },
+    { id: 't4', name: 'Charcoal Whitening Paste', description: 'Natural teeth whitening and stain removal', price: 245, category: 'Dental' },
+
+    // Hygiene & Soaps
+    { id: 's1', name: 'Antiseptic Liquid Wash', description: 'Advanced germ protection hand wash', price: 145, category: 'Hygiene' },
+    { id: 's2', name: 'Glycerin Transparent Soap', description: 'Mild and gentle for dry, sensitive skin', price: 75, category: 'Hygiene' },
+    { id: 's3', name: 'Neem & Tulsi Hand Wash', description: 'Natural antibacterial herbal protection', price: 125, category: 'Hygiene' },
+    { id: 's4', name: 'Aloe Vera Body Soap', description: 'Moisturizing bar for daily freshness', price: 60, category: 'Hygiene' },
     
     // Supplements
     { id: '2', name: 'Vitamin C + Zinc', description: 'Immunity booster supplements', price: 120, category: 'Supplements' },
     { id: '7', name: 'Multivitamin Tablets', description: 'Daily essential vitamins', price: 350, category: 'Supplements' },
-    { id: '8', name: 'Calcium + D3', description: 'Bone health supplements', price: 290, category: 'Supplements' },
-    
-    // Healthy Drinks
-    { id: '9', name: 'Green Tea Bags', description: 'Antioxidant rich detox tea', price: 180, category: 'Healthy Drinks' },
-    { id: '10', name: 'Protein Powder (Chocolate)', description: 'Whey protein for muscle recovery', price: 1499, category: 'Healthy Drinks' },
-    { id: '11', name: 'Electrolyte Energy Drink', description: 'Instant hydration and energy', price: 60, category: 'Healthy Drinks' },
-    { id: '12', name: 'Nutritional Shake', description: 'Complete balanced nutrition drink', price: 450, category: 'Healthy Drinks' },
-    
-    // First Aid
-    { id: '5', name: 'Band-Aid Pack', description: 'Waterproof adhesive bandages', price: 50, category: 'First Aid' },
+    { id: '10', name: 'Protein Powder (Chocolate)', description: 'Whey protein for muscle recovery', price: 1499, category: 'Supplements' },
   ];
 
   useEffect(() => {
@@ -53,7 +69,6 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
       return;
     }
     setIsLoading(true);
-    // When searching, we reset category to 'All' to show all relevant results
     setActiveCategory('All');
     const results = await searchMedicines(searchQuery);
     if (results.length > 0) {
@@ -79,34 +94,24 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
 
   const handlePaymentSuccess = () => {
     setIsPaymentOpen(false);
-    
-    // Trigger global handlers
     const itemNames = cart.map(c => c.name);
     onOrderComplete(itemNames, totalAmount);
-
     setCart([]);
     setShowCart(false);
   };
 
-  // Filter Logic
   const filteredMedicines = medicines.filter(med => {
     if (activeCategory === 'All') return true;
-    if (activeCategory === 'Healthy Drinks') return med.category === 'Healthy Drinks';
-    if (activeCategory === 'Supplements') return med.category === 'Supplements';
-    if (activeCategory === 'Medicines') {
-      // Everything else is considered a medicine
-      return med.category !== 'Healthy Drinks' && med.category !== 'Supplements';
-    }
-    return true;
+    return med.category === activeCategory;
   });
 
   return (
     <div className="flex flex-col h-full bg-white md:bg-gray-50 dark:bg-gray-900 max-h-[calc(100vh-80px)] md:max-h-screen relative">
-      <div className="p-6 pb-24 md:pb-6 max-w-6xl mx-auto w-full overflow-y-auto">
+      <div className="p-6 pb-24 md:pb-6 max-w-6xl mx-auto w-full overflow-y-auto scrollbar-hide">
         <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pharmacy & Wellness</h1>
-            <p className="text-gray-500 dark:text-gray-400">Order medicines, supplements, and health drinks.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pharmacy & Personal Care</h1>
+            <p className="text-gray-500 dark:text-gray-400">Trusted solutions for skin, hair, teeth and general health.</p>
           </div>
           <button 
             onClick={() => setShowCart(true)}
@@ -129,7 +134,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search for medicines, drinks, supplements..."
+            placeholder="Search acne gel, hair fall serum, sensitivity toothpaste..."
             className="flex-1 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl px-4 py-3 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-teal-500"
           />
           <button 
@@ -163,9 +168,11 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
           {filteredMedicines.map((med, idx) => (
             <div key={`${med.id}-${idx}`} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 hover:shadow-md transition-shadow flex flex-col h-full animate-in fade-in duration-300">
               <div className="flex justify-between items-start mb-3">
-                <span className={`text-xs px-2 py-1 rounded-lg font-medium ${
-                  med.category === 'Healthy Drinks' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
-                  med.category === 'Supplements' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                <span className={`text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider ${
+                  med.category === 'Skin & Face' ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300' :
+                  med.category === 'Hair Care' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' :
+                  med.category === 'Dental' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
+                  med.category === 'Hygiene' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
                   'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
                 }`}>
                   {med.category || 'General'}
@@ -174,11 +181,11 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
               </div>
               <div className="flex-1 mb-4">
                 <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg mb-1">{med.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{med.description}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">{med.description}</p>
               </div>
               <button 
                 onClick={() => addToCart(med)}
-                className="w-full py-2.5 rounded-xl border-2 border-teal-600 text-teal-600 font-medium hover:bg-teal-600 hover:text-white transition-all flex items-center justify-center dark:hover:bg-teal-500 dark:border-teal-500 dark:text-teal-400 dark:hover:text-white"
+                className="w-full py-2.5 rounded-xl border-2 border-teal-600 text-teal-600 font-bold text-sm uppercase tracking-widest hover:bg-teal-600 hover:text-white transition-all flex items-center justify-center dark:hover:bg-teal-500 dark:border-teal-500 dark:text-teal-400 dark:hover:text-white"
               >
                 Add to Cart
               </button>
@@ -193,7 +200,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
         )}
       </div>
 
-      {/* Cart Sidebar / Modal */}
+      {/* Cart Sidebar */}
       {showCart && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex justify-end">
           <div className="w-full max-w-md bg-white dark:bg-gray-800 h-full shadow-2xl p-6 flex flex-col animate-in slide-in-from-right duration-300">
@@ -204,7 +211,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-4">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
               {cart.length === 0 ? (
                 <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                   <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
@@ -213,12 +220,12 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
               ) : (
                 cart.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                    <div>
-                      <h4 className="font-semibold text-gray-800 dark:text-gray-200">{item.name}</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded inline-block mt-1">{item.category}</p>
+                    <div className="flex-1 min-w-0 mr-4">
+                      <h4 className="font-semibold text-gray-800 dark:text-gray-200 truncate">{item.name}</h4>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded inline-block mt-1 font-bold">{item.category}</p>
                     </div>
                     <div className="flex items-center space-x-3">
-                      <span className="font-medium text-gray-900 dark:text-white">₹{item.price}</span>
+                      <span className="font-bold text-gray-900 dark:text-white">₹{item.price}</span>
                       <button onClick={() => removeFromCart(idx)} className="text-red-400 hover:text-red-600 p-2">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -233,7 +240,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
                 <span>Subtotal</span>
                 <span>₹{subtotal}</span>
               </div>
-              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 font-medium">
                 <span>GST (12%)</span>
                 <span>₹{gst}</span>
               </div>
@@ -241,13 +248,13 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
                 <span>Platform Fee</span>
                 <span>₹{platformFee}</span>
               </div>
-              <div className="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-700">
+              <div className="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-700 mt-2">
                 <span className="font-bold text-gray-900 dark:text-white">Total Amount</span>
-                <span className="text-2xl font-bold text-teal-600 dark:text-teal-400">₹{totalAmount}</span>
+                <span className="text-2xl font-black text-teal-600 dark:text-teal-400">₹{totalAmount}</span>
               </div>
               <button 
                 disabled={cart.length === 0}
-                className="w-full bg-teal-600 text-white py-3.5 rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed shadow-lg shadow-teal-200 dark:shadow-none mt-4"
+                className="w-full bg-teal-600 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest hover:bg-teal-700 transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed shadow-lg shadow-teal-200 dark:shadow-none mt-4"
                 onClick={() => setIsPaymentOpen(true)}
               >
                 Checkout Now
@@ -263,7 +270,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
         onClose={() => setIsPaymentOpen(false)}
         onSuccess={handlePaymentSuccess}
         amount={totalAmount}
-        title="Checkout Medicine"
+        title="Checkout Order"
       />
     </div>
   );

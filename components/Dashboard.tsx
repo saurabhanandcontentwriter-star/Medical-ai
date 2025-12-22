@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { VitalSign, OrderItem, AppView } from '../types';
 
@@ -32,6 +33,12 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   
+  // SOS State
+  const [isSosModalOpen, setIsSosModalOpen] = useState(false);
+  const [sosCountdown, setSosCountdown] = useState(5);
+  const [sosAlertSent, setSosAlertSent] = useState(false);
+  const sosTimerRef = useRef<number | null>(null);
+
   // Greeting State
   const [showGreeting, setShowGreeting] = useState(true);
 
@@ -40,6 +47,32 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: 
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // SOS Countdown logic
+  useEffect(() => {
+    if (isSosModalOpen && sosCountdown > 0 && !sosAlertSent) {
+      sosTimerRef.current = window.setTimeout(() => {
+        setSosCountdown(prev => prev - 1);
+      }, 1000);
+    } else if (isSosModalOpen && sosCountdown === 0 && !sosAlertSent) {
+      setSosAlertSent(true);
+      // Here you would trigger actual SOS logic (API call, SMS, etc.)
+    }
+    return () => {
+      if (sosTimerRef.current) clearTimeout(sosTimerRef.current);
+    };
+  }, [isSosModalOpen, sosCountdown, sosAlertSent]);
+
+  const handleSosTrigger = () => {
+    setIsSosModalOpen(true);
+    setSosCountdown(5);
+    setSosAlertSent(false);
+  };
+
+  const cancelSos = () => {
+    setIsSosModalOpen(false);
+    if (sosTimerRef.current) clearTimeout(sosTimerRef.current);
+  };
 
   // Greeting Timer
   useEffect(() => {
@@ -154,11 +187,9 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: 
     setVitals(updatedVitals);
 
     // 2. Update History Data (Append new point)
-    // We clone the last entry to keep other values stable, then update the logged one
     const lastEntry = historyData[historyData.length - 1];
-    const newEntry: any = { ...lastEntry, name: 'Now' }; // In a real app, use actual date
+    const newEntry: any = { ...lastEntry, name: 'Now' }; 
     
-    // Parse value for chart
     if (logForm.vitalId === 'bp') {
       const parts = logForm.value.split('/');
       if (parts.length === 2) {
@@ -175,13 +206,12 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: 
       newEntry.temp = parseFloat(logForm.value);
     }
 
-    setHistoryData([...historyData.slice(1), newEntry]); // Keep array size constant for demo
+    setHistoryData([...historyData.slice(1), newEntry]); 
     
     // Reset and Close
     setIsModalOpen(false);
     setLogForm(prev => ({ ...prev, value: '' }));
     
-    // Switch view to the updated metric
     setSelectedVitalId(logForm.vitalId);
   };
 
@@ -219,9 +249,26 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: 
       )}
 
       <header className="mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Health Overview</h1>
-          <p className="text-gray-500 dark:text-gray-400">Track your vitals and view historical trends.</p>
+        <div className="flex items-center space-x-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Health Overview</h1>
+            <p className="text-gray-500 dark:text-gray-400">Track your vitals and view historical trends.</p>
+          </div>
+          {/* SOS Button */}
+          <button 
+            onClick={handleSosTrigger}
+            className="group relative flex items-center justify-center p-3 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg shadow-red-200 dark:shadow-none animate-pulse transition-all transform hover:scale-110 active:scale-95 z-40"
+            title="Emergency SOS"
+          >
+            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+            </svg>
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+            <span className="hidden md:block ml-2 font-bold text-xs uppercase tracking-tighter">SOS</span>
+          </button>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3">
@@ -278,6 +325,76 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: 
           </button>
         </div>
       </header>
+
+      {/* SOS Modal */}
+      {isSosModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-red-900/40 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 border-4 border-red-500 overflow-hidden relative">
+            {!sosAlertSent ? (
+              <div className="text-center space-y-6">
+                <div className="relative inline-block">
+                  <div className="w-32 h-32 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-600 dark:text-red-400 text-6xl font-black animate-pulse">
+                    {sosCountdown}
+                  </div>
+                  <div className="absolute inset-0 border-4 border-red-500 rounded-full animate-ping opacity-25"></div>
+                </div>
+                
+                <div>
+                  <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Emergency Alert</h2>
+                  <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Alerting emergency contacts in {sosCountdown} seconds...</p>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl text-left border border-gray-100 dark:border-gray-700">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Emergency Contacts</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-800 dark:text-white text-sm">Priya Sharma</p>
+                      <p className="text-xs text-gray-500">+91 98765 43211</p>
+                    </div>
+                    <span className="px-2 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-[10px] font-bold rounded">Primary</span>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={cancelSos}
+                  className="w-full py-4 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-2xl font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl"
+                >
+                  STOP ALERT
+                </button>
+              </div>
+            ) : (
+              <div className="text-center space-y-6 animate-in zoom-in-95 duration-500">
+                <div className="w-32 h-32 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 mx-auto">
+                   <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                
+                <div>
+                  <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Help is Coming</h2>
+                  <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Your location and health data have been shared.</p>
+                </div>
+
+                <div className="space-y-3">
+                  <a href="tel:112" className="w-full flex items-center justify-center p-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition-colors shadow-lg">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    CALL POLICE (112)
+                  </a>
+                  <a href="tel:102" className="w-full flex items-center justify-center p-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-colors shadow-lg">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    CALL AMBULANCE (102)
+                  </a>
+                </div>
+
+                <button 
+                  onClick={() => setIsSosModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-bold underline"
+                >
+                  Close Window
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Vitals Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
