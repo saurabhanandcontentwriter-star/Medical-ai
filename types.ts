@@ -41,7 +41,18 @@ export enum AppView {
   YOGA = 'YOGA',
   TRACKING = 'TRACKING',
   PROFILE = 'PROFILE',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',
+  MED_REMINDERS = 'MED_REMINDERS'
+}
+
+export interface MedicationReminder {
+  id: string;
+  name: string;
+  dosage: string;
+  time: string;
+  type: 'pill' | 'syrup' | 'injection' | 'topical';
+  isTakenToday: boolean;
+  lastTakenDate?: string;
 }
 
 export interface DoctorSearchResult {

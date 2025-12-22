@@ -19,19 +19,17 @@ export const sendMessageToGemini = async (
 ): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const recentHistory = history.slice(-10).map(msg => 
-      `${msg.sender === Sender.USER ? 'User' : 'Model'}: ${msg.text}`
-    ).join('\n');
-
-    const prompt = `${recentHistory}\nUser: ${newMessage}\nModel:`;
-
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    
+    // Using the official Chat API for conversational continuity
+    const chat = ai.chats.create({
       model: 'gemini-3-flash-preview',
-      contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-      }
+      },
     });
+
+    // Send message through the chat session
+    const response = await chat.sendMessage({ message: newMessage });
 
     return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
   } catch (error) {
@@ -149,7 +147,8 @@ export const searchDoctors = async (
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }],
+        // Updated to use googleMaps tool as per place-based retrieval requirements
+        tools: [{ googleMaps: {} }],
         systemInstruction: "You are a helpful medical assistant. When asked to find doctors, use Google Maps to find real places.",
       }
     });
@@ -272,7 +271,8 @@ export const fetchHealthNews = async (language: 'English' | 'Hindi' = 'English')
       IMPORTANT: All text fields (title, summary, category, source) MUST be in ${language}.
       Provide 6-8 news items as structured JSON.`,
       config: {
-        tools: [{ googleSearch: {} }],
+        // Removed googleSearch tool because it is incompatible with application/json responseMimeType
+        // According to guidelines, response.text should not be parsed as JSON when grounding is enabled.
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,

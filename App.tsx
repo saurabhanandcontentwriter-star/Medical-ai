@@ -15,7 +15,8 @@ import OrderTracking from './components/OrderTracking';
 import AdminPanel from './components/AdminPanel';
 import FloatingChatbot from './components/FloatingChatbot';
 import Login from './components/Login';
-import { AppView, AppNotification, Message, Sender, OrderItem, UserProfile } from './types';
+import MedicationReminders from './components/MedicationReminders';
+import { AppView, AppNotification, Message, Sender, OrderItem, UserProfile, MedicationReminder } from './types';
 
 function App() {
   // Auth State
@@ -45,7 +46,7 @@ function App() {
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
   
-  // Centralized State for Notifications and Chat
+  // Centralized State
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<Message[]>([
@@ -56,6 +57,29 @@ function App() {
       timestamp: new Date()
     }
   ]);
+
+  // Medication Reminders State
+  const [reminders, setReminders] = useState<MedicationReminder[]>(() => {
+    const saved = localStorage.getItem('medassist_reminders');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Reset isTakenToday if it's a new day
+      const today = new Date().toDateString();
+      return parsed.map((r: MedicationReminder) => ({
+        ...r,
+        isTakenToday: r.lastTakenDate === today ? r.isTakenToday : false
+      }));
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('medassist_reminders', JSON.stringify(reminders));
+  }, [reminders]);
+
+  const handleUpdateReminder = (updatedReminders: MedicationReminder[]) => {
+    setReminders(updatedReminders);
+  };
 
   // Initial dummy data for orders/tracking
   const [orders, setOrders] = useState<OrderItem[]>([
@@ -135,7 +159,7 @@ function App() {
     setCurrentView(AppView.DASHBOARD);
   };
 
-  // Handlers for Order/Booking completion
+  // Handlers
   const handleMedicineOrderComplete = (itemNames: string[], amount: number) => {
     const itemList = itemNames.join(', ');
     const orderId = Math.floor(1000 + Math.random() * 9000).toString();
@@ -163,8 +187,8 @@ function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addChatMessage(`Your medicine order #${orderId} for ₹${amount} has been placed! You can track it in the 'Track Orders' section.`);
-    addNotification('Order Confirmed', `Order #${orderId} containing: ${itemList}. Total: ₹${amount}`, 'order');
+    addChatMessage(`Your medicine order #${orderId} for ₹${amount} has been placed!`);
+    addNotification('Order Confirmed', `Order #${orderId} for ₹${amount} is confirmed.`, 'order');
   };
 
   const handleLabTestBookingComplete = (testName: string, date: string, amount: number) => {
@@ -193,8 +217,8 @@ function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addChatMessage(`Your appointment for ${testName} is confirmed for ${date}. Booking ID: #${orderId}.`);
-    addNotification('Booking Confirmed', `Lab Test Booking #${orderId} for ${testName}. Date: ${date}.`, 'order');
+    addChatMessage(`Your appointment for ${testName} is confirmed for ${date}.`);
+    addNotification('Booking Confirmed', `Lab Test #${orderId} booked for ${testName}.`, 'order');
   };
 
   const handleDoctorAppointment = (doctorName: string, date: string, time: string, amount: number) => {
@@ -321,7 +345,8 @@ function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative">
-        {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} />}
+        {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
+        {currentView === AppView.MED_REMINDERS && <MedicationReminders reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
         {currentView === AppView.CHAT && <SymptomChat />}
         {currentView === AppView.ANALYZER && <ReportAnalyzer />}
         {currentView === AppView.DOCTOR_FINDER && <DoctorFinder onBookAppointment={handleDoctorAppointment} />}
