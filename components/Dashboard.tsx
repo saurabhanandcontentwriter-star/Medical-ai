@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { VitalSign, OrderItem, AppView, MedicationReminder } from '../types';
+import { generateDoctorAvatar } from '../services/geminiService';
 
-// Initial historical data for the chart
 const initialHistoryData = [
   { name: 'Mon', hr: 72, sys: 120, dia: 80, spo2: 98, temp: 98.4 },
   { name: 'Tue', hr: 75, sys: 122, dia: 82, spo2: 97, temp: 98.6 },
@@ -28,338 +28,455 @@ interface DashboardProps {
   onUpdateReminders?: (reminders: MedicationReminder[]) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = (view: AppView) => {}, reminders = [], onUpdateReminders }) => {
+const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {}, reminders = [], onUpdateReminders }) => {
   const [vitals, setVitals] = useState<VitalSign[]>(initialVitals);
   const [historyData, setHistoryData] = useState(initialHistoryData);
-  const [selectedVitalId, setSelectedVitalId] = useState<string>('hr');
+  const [activeChartKey, setActiveChartKey] = useState<string>('hr');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  
-  // SOS State
-  const [isSosModalOpen, setIsSosModalOpen] = useState(false);
-  const [sosCountdown, setSosCountdown] = useState(5);
-  const [sosAlertSent, setSosAlertSent] = useState(false);
-  const sosTimerRef = useRef<number | null>(null);
+  const [maleDrAvatar, setMaleDrAvatar] = useState<string | null>(null);
+  const [femaleDrAvatar, setFemaleDrAvatar] = useState<string | null>(null);
+  const [healthScore, setHealthScore] = useState(88);
 
-  // Greeting State
-  const [showGreeting, setShowGreeting] = useState(true);
+  // Form State for Log Reading
+  const [logForm, setLogForm] = useState({
+    day: 'Sun',
+    hr: 72,
+    sys: 120,
+    dia: 80,
+    spo2: 98
+  });
 
-  // Prescription Logic
-  const todayTaken = reminders.filter(r => r.isTakenToday).length;
-  const totalMeds = reminders.length;
-  const adherencePercent = totalMeds > 0 ? Math.round((todayTaken / totalMeds) * 100) : 0;
-  
-  const nextMed = reminders
-    .filter(r => !r.isTakenToday)
-    .sort((a, b) => a.time.localeCompare(b.time))[0];
+  const [location, setLocation] = useState({
+    city: 'Patna',
+    fullAddress: 'PATNA, BIHAR',
+    loading: true
+  });
 
-  // Clock Timer
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const [weather, setWeather] = useState({
+    temp: '--',
+    condition: 'SUNNY',
+    aqi: '--',
+    aqiLevel: 'FETCHING',
+    aqiColor: 'bg-gray-300'
+  });
 
-  // SOS Countdown logic
-  useEffect(() => {
-    if (isSosModalOpen && sosCountdown > 0 && !sosAlertSent) {
-      sosTimerRef.current = window.setTimeout(() => {
-        setSosCountdown(prev => prev - 1);
-      }, 1000);
-    } else if (isSosModalOpen && sosCountdown === 0 && !sosAlertSent) {
-      setSosAlertSent(true);
+  const fetchRealHealthData = useCallback(async () => {
+    setLocation(prev => ({ ...prev, loading: true }));
+    
+    if (!("geolocation" in navigator)) {
+      setLocation({ city: 'Patna', fullAddress: 'PATNA, BIHAR', loading: false });
+      return;
     }
-    return () => {
-      if (sosTimerRef.current) clearTimeout(sosTimerRef.current);
-    };
-  }, [isSosModalOpen, sosCountdown, sosAlertSent]);
 
-  const handleSosTrigger = () => {
-    setIsSosModalOpen(true);
-    setSosCountdown(5);
-    setSosAlertSent(false);
-  };
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords;
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const geoData = await geoRes.json();
+        const city = geoData?.address?.city || geoData?.address?.town || geoData?.address?.suburb || geoData?.address?.village || "Your Area";
+        const state = (geoData?.address?.state || 'Bihar').toUpperCase();
 
-  const cancelSos = () => {
-    setIsSosModalOpen(false);
-    if (sosTimerRef.current) clearTimeout(sosTimerRef.current);
-  };
+        const [weatherRes, aqiRes] = await Promise.all([
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`).catch(() => null),
+          fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current_air_quality=true`).catch(() => null)
+        ]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowGreeting(false), 4000);
-    return () => clearTimeout(timer);
-  }, []);
-  
-  const upcomingAppointments = orders
-    .filter(o => o.type === 'doctor_appointment' && ['Confirmed', 'Scheduled'].includes(o.status))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 3);
+        let tempValue = '--';
+        let aqiValueStr = '--';
+        let aqiLevelStr = 'UNKNOWN';
+        let color = 'bg-gray-300';
 
-  // Weather State
-  const [weather, setWeather] = useState<{
-    temp: number;
-    condition: string;
-    location: string;
-    loading: boolean;
-  }>({ temp: 0, condition: '', location: 'Detecting...', loading: true });
-
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-          const weatherData = await weatherRes.json();
-          const locationRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          const locationData = await locationRes.json();
-          const city = locationData.address.city || locationData.address.town || locationData.address.village || locationData.address.county || "Unknown";
-          const code = weatherData.current_weather.weathercode;
-          let cond = "Sunny";
-          if (code >= 1 && code <= 3) cond = "Partly Cloudy";
-          else if (code >= 45 && code <= 48) cond = "Foggy";
-          else if (code >= 51 && code <= 67) cond = "Rainy";
-          setWeather({ temp: weatherData.current_weather.temperature, condition: cond, location: city, loading: false });
-        } catch (error) {
-          setWeather({ temp: 28, condition: 'Sunny', location: 'Patna', loading: false });
+        if (weatherRes && weatherRes.ok) {
+          const wData = await weatherRes.json();
+          if (wData?.current_weather?.temperature !== undefined) {
+            tempValue = Math.round(wData.current_weather.temperature).toString();
+          }
         }
-      }, () => setWeather({ temp: 28, condition: 'Sunny', location: 'Patna', loading: false }));
-    }
-  }, []);
-  
-  const [logForm, setLogForm] = useState({ vitalId: 'hr', value: '', date: 'Mon' });
-  const selectedVital = vitals.find(v => v.id === selectedVitalId) || vitals[0];
 
-  const getChartConfig = (id: string) => {
-    switch(id) {
-      case 'hr': return { key: 'hr', color: '#f43f5e', label: 'Heart Rate' };
-      case 'bp': return { key: 'sys', color: '#3b82f6', label: 'Systolic BP' };
-      case 'spo2': return { key: 'spo2', color: '#14b8a6', label: 'Oxygen %' };
-      case 'temp': return { key: 'temp', color: '#f59e0b', label: 'Temperature' };
-      default: return { key: 'hr', color: '#f43f5e', label: 'Value' };
-    }
-  };
+        if (aqiRes && aqiRes.ok) {
+          const aData = await aqiRes.json();
+          // FIXED: Added extensive optional chaining to prevent "us_aqi" of undefined
+          const aqiVal = aData?.current_air_quality?.us_aqi;
+          if (aqiVal !== undefined && aqiVal !== null) {
+            aqiValueStr = aqiVal.toString();
+            if (aqiVal > 150) { color = 'bg-red-500'; aqiLevelStr = 'POOR'; }
+            else if (aqiVal > 100) { color = 'bg-orange-500'; aqiLevelStr = 'UNHEALTHY'; }
+            else if (aqiVal > 50) { color = 'bg-yellow-500'; aqiLevelStr = 'MODERATE'; }
+            else { color = 'bg-green-500'; aqiLevelStr = 'GOOD'; }
+          }
+        }
 
-  const chartConfig = getChartConfig(selectedVitalId);
+        setLocation({
+          city: city,
+          fullAddress: `${city.toUpperCase()}, ${state}`,
+          loading: false
+        });
 
-  const handleLogSubmit = () => {
-    if (!logForm.value) return;
-    const updatedVitals = vitals.map(v => {
-      if (v.id === logForm.vitalId) {
-        const newValue = parseFloat(logForm.value);
-        // Fix: Use a type assertion to prevent 'trend' from being widened to 'string', 
-        // ensuring compatibility with the VitalSign['trend'] union type.
-        return { ...v, value: logForm.value, trend: (newValue > parseFloat(v.value) ? 'up' : 'down') as 'up' | 'down' | 'stable' };
+        setWeather({
+          temp: tempValue,
+          condition: 'SUNNY',
+          aqi: aqiValueStr,
+          aqiLevel: aqiLevelStr,
+          aqiColor: color
+        });
+      } catch (e) {
+        console.error("Health Data Fetch Error", e);
+        setLocation({ city: 'Patna', fullAddress: 'PATNA, BIHAR', loading: false });
       }
-      return v;
+    }, () => {
+      setLocation({ city: 'Patna', fullAddress: 'PATNA, BIHAR', loading: false });
     });
-    setVitals(updatedVitals);
+  }, []);
+
+  useEffect(() => {
+    fetchRealHealthData();
+    const clock = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    // Feature: Simulate Vital Fluctuation for Live UI feel
+    const vitalSim = setInterval(() => {
+      setVitals(prev => prev.map(v => {
+        if (v.id === 'hr') {
+          const val = parseInt(v.value);
+          return { ...v, value: (val + (Math.random() > 0.5 ? 1 : -1)).toString() };
+        }
+        return v;
+      }));
+    }, 5000);
+
+    const loadAvatars = async () => {
+      const [m, f] = await Promise.all([
+        generateDoctorAvatar('male'), 
+        generateDoctorAvatar('female')
+      ]);
+      setMaleDrAvatar(m);
+      setFemaleDrAvatar(f);
+    };
+    loadAvatars();
+    return () => {
+      clearInterval(clock);
+      clearInterval(vitalSim);
+    };
+  }, [fetchRealHealthData]);
+
+  const handleLogSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedHistory = historyData.map(item => 
+      item.name === logForm.day ? { ...item, hr: logForm.hr, sys: logForm.sys, dia: logForm.dia, spo2: logForm.spo2 } : item
+    );
+    setHistoryData(updatedHistory);
+    
+    // Update live vitals UI for 'today'
+    if (logForm.day === 'Sun') { // Assuming Sun is today in this demo
+      setVitals(prev => prev.map(v => {
+        if (v.id === 'hr') return { ...v, value: logForm.hr.toString() };
+        if (v.id === 'bp') return { ...v, value: `${logForm.sys}/${logForm.dia}` };
+        if (v.id === 'spo2') return { ...v, value: logForm.spo2.toString() };
+        return v;
+      }));
+    }
+
     setIsModalOpen(false);
   };
 
-  const greeting = (() => {
-    const hour = currentTime.getHours();
-    if (hour >= 5 && hour < 12) return { text: 'Good Morning', icon: '🌅' };
-    if (hour >= 12 && hour < 17) return { text: 'Good Afternoon', icon: '☀️' };
-    if (hour >= 17 && hour < 22) return { text: 'Good Evening', icon: '🌇' };
-    return { text: 'Good Night', icon: '🌙' };
-  })();
+  const adherence = reminders.length > 0 ? Math.round((reminders.filter(r => r.isTakenToday).length / reminders.length) * 100) : 0;
+  const nextMed = reminders.filter(r => !r.isTakenToday).sort((a, b) => a.time.localeCompare(b.time))[0];
 
-  const markMedTaken = (id: string) => {
-    if (!onUpdateReminders) return;
-    const today = new Date().toDateString();
-    const updated = reminders.map(r => r.id === id ? { ...r, isTakenToday: true, lastTakenDate: today } : r);
-    onUpdateReminders(updated);
+  const getChartColor = () => {
+    if (activeChartKey === 'hr') return '#f43f5e';
+    if (activeChartKey === 'spo2') return '#0d9488';
+    return '#3b82f6';
   };
 
   return (
-    <div className="p-6 space-y-6 pb-24 md:pb-6 relative text-gray-900 dark:text-gray-100">
+    <div className="p-6 space-y-8 pb-24 md:pb-6 text-gray-900 dark:text-gray-100">
       
-      {showGreeting && (
-        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-top-5 duration-700">
-          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md shadow-lg border border-teal-100 dark:border-teal-900 rounded-full px-6 py-3 flex items-center space-x-3 min-w-[280px]">
-            <span className="text-3xl animate-bounce">{greeting.icon}</span>
-            <div className="flex-1">
-              <p className="font-bold text-teal-800 dark:text-teal-400 text-base">{greeting.text}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Welcome back to MedAssist</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <header className="mb-8 flex flex-col xl:flex-row xl:items-end justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Health Overview</h1>
-            <p className="text-gray-500 dark:text-gray-400">Track your vitals and daily prescriptions.</p>
-          </div>
-          <button onClick={handleSosTrigger} className="flex items-center justify-center p-3 bg-red-600 text-white rounded-full shadow-lg animate-pulse hover:scale-110 active:scale-95 z-40">
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
-            <span className="hidden md:block ml-2 font-bold text-xs">SOS</span>
-          </button>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-700 dark:to-blue-800 text-white px-5 py-2 rounded-xl shadow-md flex items-center min-w-[200px] justify-between transition-all hover:shadow-lg">
-            <div className="flex items-center">
-              <div className="mr-3 bg-white/20 p-2 rounded-full backdrop-blur-sm">☀️</div>
+      {/* Precision Cluster Widgets */}
+      <header className="flex flex-wrap gap-4 items-center">
+        {/* Real-Time Location Widget */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[200px] justify-between transition-all hover:shadow-md">
+           <div className="flex items-center">
+              <div className="mr-3 text-xl">📍</div>
               <div>
-                <p className="font-bold text-xl leading-none">{weather.temp}°C</p>
-                <p className="text-[10px] text-blue-100 uppercase font-black">{weather.location}</p>
+                 <p className="font-black text-teal-600 dark:text-teal-400 text-lg leading-tight truncate max-w-[120px]">
+                    {location.city}
+                 </p>
+                 <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest truncate max-w-[120px] mt-0.5">
+                    {location.fullAddress}
+                 </p>
               </div>
+           </div>
+           <button onClick={fetchRealHealthData} className={`ml-2 text-gray-300 hover:text-teal-500 transition-colors ${location.loading ? 'animate-spin' : ''}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+           </button>
+        </div>
+
+        {/* Real-Time AQI Level Widget */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[170px] justify-between transition-all hover:shadow-md">
+          <div className="flex items-center">
+            <div className="mr-3">
+              <img src="https://img.icons8.com/color/48/lungs.png" alt="AQI Icon" className="w-8 h-8" />
+            </div>
+            <div>
+              <p className="font-black text-xl leading-none text-slate-900 dark:text-white">{weather.aqi}</p>
+              <p className={`text-[9px] font-black tracking-widest mt-1 ${weather.aqiColor.replace('bg-', 'text-')}`}>
+                {weather.aqiLevel}
+              </p>
             </div>
           </div>
+          <div className={`ml-4 w-4 h-4 rounded-full ${weather.aqiColor} shadow-inner ring-4 ring-gray-50 dark:ring-gray-900 animate-pulse`}></div>
+        </div>
 
-          <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-700 dark:to-indigo-800 text-white px-5 py-2 rounded-xl shadow-md flex items-center min-w-[160px] justify-between transition-all hover:shadow-lg">
-             <div className="mr-3 bg-white/20 p-2 rounded-full backdrop-blur-sm">🕒</div>
-             <div>
-                <p className="font-bold text-xl leading-none">{currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                <p className="text-[10px] text-indigo-100 uppercase font-black">{currentTime.toLocaleDateString([], {weekday: 'short'})}</p>
-             </div>
+        {/* Temperature Widget */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[150px] justify-between transition-all hover:shadow-md">
+          <div className="flex items-center">
+            <div className="mr-3 text-2xl text-amber-500">☀️</div>
+            <div>
+              <p className="font-black text-xl leading-none">{weather.temp}°C</p>
+              <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-1">{weather.condition}</p>
+            </div>
           </div>
+        </div>
 
-          <button onClick={() => setIsModalOpen(true)} className="bg-teal-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm hover:bg-teal-700 transition-colors flex items-center justify-center">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Log Vitals
-          </button>
+        {/* Current Time/Date Widget */}
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[160px] justify-between transition-all hover:shadow-md">
+           <div className="mr-3 text-2xl">🕒</div>
+           <div>
+              <p className="font-black text-xl leading-none">{currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+              <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-1">{currentTime.toLocaleDateString([], {weekday: 'long'}).toUpperCase()}</p>
+           </div>
         </div>
       </header>
 
-      {isSosModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-red-900/40 backdrop-blur-lg flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 border-4 border-red-500 overflow-hidden text-center">
-             <div className="w-32 h-32 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-600 text-6xl font-black mx-auto mb-6">
-                {!sosAlertSent ? sosCountdown : '✓'}
+      {/* Main Analytics Grid */}
+      <section className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Health Score Feature Card */}
+          <div className="grid md:grid-cols-4 gap-4">
+             <div className="md:col-span-1 bg-teal-600 rounded-[2rem] p-6 text-white flex flex-col justify-between shadow-lg shadow-teal-200 dark:shadow-none">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Health Score</p>
+                <div className="my-2">
+                   <span className="text-5xl font-black">{healthScore}</span>
+                   <span className="text-lg opacity-50 ml-1">/100</span>
+                </div>
+                <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
+                   <div className="h-full bg-white transition-all duration-1000" style={{width: `${healthScore}%`}}></div>
+                </div>
              </div>
-             <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-4">
-               {!sosAlertSent ? 'Emergency Alert' : 'Help is Coming'}
-             </h2>
-             <button onClick={cancelSos} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-lg">
-               {!sosAlertSent ? 'STOP ALERT' : 'CLOSE'}
-             </button>
+             <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+                {vitals.map((vital) => (
+                  <div key={vital.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-transform active:scale-95 cursor-pointer">
+                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">{vital.name}</p>
+                    <p className={`text-xl font-black ${vital.color}`}>{vital.value}<span className="text-[10px] ml-0.5 opacity-50 font-bold">{vital.unit}</span></p>
+                    <div className="flex items-center mt-2">
+                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${vital.status === 'normal' ? 'bg-green-50 text-green-600' : 'bg-rose-50 text-rose-600'}`}>{vital.status}</span>
+                    </div>
+                  </div>
+                ))}
+             </div>
+          </div>
+
+          {/* Enhanced Visualization System */}
+          <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+               <div>
+                  <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Biometric Performance</h2>
+                  <div className="flex gap-4 mt-2">
+                     {['hr', 'sys', 'spo2'].map(key => (
+                       <button 
+                         key={key} 
+                         onClick={() => setActiveChartKey(key)}
+                         className={`text-[10px] font-black uppercase tracking-widest pb-1 transition-all border-b-2 ${activeChartKey === key ? 'text-teal-600 border-teal-600' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
+                       >
+                         {key === 'hr' ? 'Heart Rate' : key === 'sys' ? 'BP (Systolic)' : 'Oxygen Level'}
+                       </button>
+                     ))}
+                  </div>
+               </div>
+               <button onClick={() => setIsModalOpen(true)} className="bg-teal-600 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all flex items-center gap-2">
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                 Log Vitals
+               </button>
+             </div>
+             <div className="h-64 md:h-80">
+               <ResponsiveContainer width="100%" height="100%">
+                 <LineChart data={historyData}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                   <XAxis 
+                     dataKey="name" 
+                     axisLine={false} 
+                     tickLine={false} 
+                     tick={{fontSize: 10, fontWeight: '900', fill: '#94a3b8'}} 
+                   />
+                   <YAxis 
+                     hide={true} 
+                     domain={['auto', 'auto']}
+                   />
+                   <Tooltip 
+                     contentStyle={{ 
+                       borderRadius: '16px', 
+                       border: 'none', 
+                       boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                       padding: '12px',
+                       fontWeight: '900',
+                       textTransform: 'uppercase',
+                       fontSize: '10px'
+                     }}
+                   />
+                   <Line 
+                     type="monotone" 
+                     dataKey={activeChartKey} 
+                     stroke={getChartColor()} 
+                     strokeWidth={5} 
+                     dot={{ r: 6, fill: getChartColor(), strokeWidth: 3, stroke: '#fff' }}
+                     activeDot={{ r: 8, strokeWidth: 0 }}
+                     animationDuration={1500}
+                   />
+                   {activeChartKey === 'sys' && (
+                     <Line 
+                      type="monotone" 
+                      dataKey="dia" 
+                      stroke="#93c5fd" 
+                      strokeWidth={3} 
+                      strokeDasharray="5 5"
+                      dot={false}
+                     />
+                   )}
+                 </LineChart>
+               </ResponsiveContainer>
+             </div>
+          </div>
+
+          {/* AI Doctors Cluster */}
+          <div className="grid md:grid-cols-2 gap-4">
+             <div onClick={() => onNavigate(AppView.VIDEO_CONSULT)} className="group bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 cursor-pointer hover:border-teal-500 transition-all shadow-sm flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center">
+                   {maleDrAvatar ? <img src={maleDrAvatar} className="w-full h-full object-cover" /> : <span className="text-2xl">👨‍⚕️</span>}
+                </div>
+                <div>
+                   <h3 className="font-black text-lg uppercase tracking-tighter">Dr. Aryan</h3>
+                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">AI General Physician</p>
+                </div>
+             </div>
+             <div onClick={() => onNavigate(AppView.VIDEO_CONSULT)} className="group bg-white dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 cursor-pointer hover:border-teal-500 transition-all shadow-sm flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-teal-50 overflow-hidden flex items-center justify-center">
+                   {femaleDrAvatar ? <img src={femaleDrAvatar} className="w-full h-full object-cover" /> : <span className="text-2xl">👩‍⚕️</span>}
+                </div>
+                <div>
+                   <h3 className="font-black text-lg uppercase tracking-tighter">Dr. Ishani</h3>
+                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">AI Wellness Specialist</p>
+                </div>
+             </div>
           </div>
         </div>
-      )}
 
-      {/* Vitals Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {vitals.map((vital) => (
-          <div key={vital.id} onClick={() => setSelectedVitalId(vital.id)} className={`p-4 rounded-2xl shadow-sm border transition-all cursor-pointer ${selectedVitalId === vital.id ? 'bg-teal-50 dark:bg-teal-900/30 border-teal-500 ring-1 ring-teal-500' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:shadow-md'}`}>
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-gray-400">{vital.name}</span>
-            </div>
-            <div className="flex items-baseline space-x-1">
-              <span className={`text-2xl font-bold ${vital.color}`}>{vital.value}</span>
-              <span className="text-xs text-gray-400">{vital.unit}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Chart Area */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{selectedVital.name} History</h2>
-          </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                <defs><linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={chartConfig.color} stopOpacity={0.2}/><stop offset="95%" stopColor={chartConfig.color} stopOpacity={0}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" className="dark:opacity-20" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <Tooltip />
-                <Area type="monotone" dataKey={chartConfig.key} stroke={chartConfig.color} strokeWidth={3} fill="url(#colorMetric)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Prescription Adherence Widget */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col justify-between">
-           <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-gray-900 dark:text-white">Daily Adherence</h3>
-              <button onClick={() => onNavigate(AppView.MED_REMINDERS)} className="text-teal-600 text-xs font-bold uppercase tracking-widest hover:underline">Manage</button>
-           </div>
-           
-           <div className="flex items-center space-x-6">
-              <div className="relative w-24 h-24 flex items-center justify-center">
-                 <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-gray-100 dark:text-gray-700" />
-                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={251.2} strokeDashoffset={251.2 - (251.2 * adherencePercent) / 100} className="text-teal-500" />
-                 </svg>
-                 <span className="absolute font-black text-xl text-teal-600">{adherencePercent}%</span>
+        {/* Side Panel: Medication & Activity */}
+        <div className="space-y-6">
+           <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between min-h-[300px]">
+              <div className="flex justify-between items-start mb-6">
+                 <h3 className="text-xl font-black uppercase tracking-tighter">Daily Meds</h3>
+                 <span className="text-teal-600 font-black text-lg">{adherence}%</span>
               </div>
-              <div className="space-y-1">
-                 <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Prescriptions</p>
-                 <p className="text-2xl font-black text-gray-900 dark:text-white">{todayTaken} / {totalMeds}</p>
-                 <p className="text-xs text-gray-500">Doses taken today</p>
+              <div className="h-3 w-full bg-gray-50 rounded-full overflow-hidden mb-8">
+                 <div className="h-full bg-teal-500 transition-all duration-1000" style={{width: `${adherence}%`}}></div>
               </div>
-           </div>
-
-           <div className="mt-6 pt-6 border-t border-gray-50 dark:border-gray-700">
-              <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-3">Up Next</p>
               {nextMed ? (
-                <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl">
-                   <div className="flex items-center space-x-3">
-                      <span className="text-xl">💊</span>
-                      <div>
-                        <p className="font-bold text-gray-900 dark:text-white text-sm">{nextMed.name}</p>
-                        <p className="text-[10px] text-teal-600 font-bold">{nextMed.time} • {nextMed.dosage}</p>
-                      </div>
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                   <div className="truncate mr-2">
+                      <p className="font-bold text-sm truncate">{nextMed.name}</p>
+                      <p className="text-[10px] text-teal-600 font-black uppercase tracking-widest mt-1">{nextMed.time} • {nextMed.dosage}</p>
                    </div>
-                   <button onClick={() => markMedTaken(nextMed.id)} className="px-3 py-1.5 bg-teal-600 text-white text-[10px] font-bold rounded-lg hover:bg-teal-700 transition-colors">DONE</button>
+                   <button onClick={() => onUpdateReminders?.(reminders.map(r => r.id === nextMed.id ? {...r, isTakenToday: true} : r))} className="w-8 h-8 bg-teal-600 text-white rounded-lg flex items-center justify-center hover:bg-teal-700 transition-colors shadow-sm">✓</button>
                 </div>
               ) : (
-                <div className="text-center py-2">
-                   <p className="text-xs text-gray-400 italic">No more doses for today!</p>
-                </div>
+                <p className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest py-8">Prescription Complete ✨</p>
               )}
            </div>
-        </div>
-      </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 dark:from-teal-600 dark:to-teal-800 rounded-2xl p-6 text-white shadow-lg">
-          <h3 className="font-bold mb-2">Healthy Tip</h3>
-          <p className="text-teal-100 text-sm">Drinking 2L of water today helps with vitamin absorption.</p>
+           {/* Dynamic Action Goal Card */}
+           <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden group hover:scale-[1.02] transition-transform">
+              <div className="relative z-10">
+                 <h3 className="text-xl font-black uppercase tracking-tighter mb-4">Steps Tracker</h3>
+                 <div className="space-y-4">
+                    <div className="flex justify-between text-xs font-bold uppercase tracking-widest">
+                       <span>Walking Goal</span>
+                       <span>6.5k / 10k</span>
+                    </div>
+                    <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden">
+                       <div className="h-full bg-white w-[65%] shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
+                    </div>
+                    <p className="text-[10px] font-medium opacity-60 uppercase tracking-widest mt-4">2.4 km remaining for today</p>
+                 </div>
+              </div>
+              <span className="absolute -bottom-4 -right-4 text-9xl opacity-10 select-none pointer-events-none group-hover:rotate-12 transition-transform duration-700">🧘</span>
+           </div>
         </div>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-gray-900 dark:text-white">Appointments</h3>
-          </div>
-          {upcomingAppointments.length > 0 ? (
-            <div className="space-y-2">
-              {upcomingAppointments.map(apt => (
-                <div key={apt.id} className="text-xs p-2 bg-gray-50 dark:bg-gray-700 rounded-lg flex justify-between">
-                  <span className="font-bold">{apt.title}</span>
-                  <span className="text-teal-600">{apt.status}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400 italic">No upcoming visits.</p>
-          )}
-        </div>
+      </section>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-          <h3 className="font-bold text-gray-900 dark:text-white mb-2">Track Activity</h3>
-          <div className="h-2 w-full bg-gray-100 rounded-full mt-4"><div className="h-2 bg-teal-500 rounded-full w-[65%]"></div></div>
-          <p className="text-[10px] text-gray-400 uppercase mt-2 font-black">6,500 / 10,000 Steps</p>
-        </div>
-      </div>
-
+      {/* Manual Vitals Log Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl w-full max-w-sm p-8">
-            <h3 className="text-xl font-bold mb-6">Log Reading</h3>
-            <div className="space-y-4">
-              <select value={logForm.vitalId} onChange={e => setLogForm({...logForm, vitalId: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl font-bold">
-                {vitals.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </select>
-              <input type="text" value={logForm.value} onChange={e => setLogForm({...logForm, value: e.target.value})} placeholder="Enter Value" className="w-full p-3 bg-gray-50 dark:bg-gray-700 rounded-xl font-bold" />
-              <button onClick={handleLogSubmit} className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black">SAVE</button>
-            </div>
+        <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-6">Log Health Data</h3>
+            <form onSubmit={handleLogSubmit} className="space-y-5">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Day</label>
+                <select 
+                  value={logForm.day}
+                  onChange={e => setLogForm({...logForm, day: e.target.value})}
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-2xl font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                >
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+                    <option key={day} value={day}>{day}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Heart Rate (bpm)</label>
+                   <input 
+                     type="number" 
+                     value={logForm.hr}
+                     onChange={e => setLogForm({...logForm, hr: parseInt(e.target.value)})}
+                     className="w-full p-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-2xl font-bold text-gray-900 dark:text-white"
+                   />
+                 </div>
+                 <div>
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">SpO2 (%)</label>
+                   <input 
+                     type="number" 
+                     value={logForm.spo2}
+                     onChange={e => setLogForm({...logForm, spo2: parseInt(e.target.value)})}
+                     className="w-full p-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-2xl font-bold text-gray-900 dark:text-white"
+                   />
+                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">BP (Sys)</label>
+                   <input 
+                     type="number" 
+                     value={logForm.sys}
+                     onChange={e => setLogForm({...logForm, sys: parseInt(e.target.value)})}
+                     className="w-full p-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-2xl font-bold text-gray-900 dark:text-white"
+                   />
+                 </div>
+                 <div>
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">BP (Dia)</label>
+                   <input 
+                     type="number" 
+                     value={logForm.dia}
+                     onChange={e => setLogForm({...logForm, dia: parseInt(e.target.value)})}
+                     className="w-full p-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-2xl font-bold text-gray-900 dark:text-white"
+                   />
+                 </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black uppercase text-xs tracking-widest">Cancel</button>
+                 <button type="submit" className="flex-1 py-4 bg-teal-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-teal-200">Save Log</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

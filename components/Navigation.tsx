@@ -8,12 +8,19 @@ interface NavigationProps {
   onLogout: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  onAdminRequest: () => void;
 }
 
-const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout, isDarkMode, toggleDarkMode }) => {
+const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout, isDarkMode, toggleDarkMode, onAdminRequest }) => {
   const navItems = [
     { id: AppView.DASHBOARD, label: 'Dashboard', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+    )},
+    { id: AppView.VIDEO_CONSULT, label: 'Video Consult', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+    )},
+    { id: AppView.BLOG, label: 'Health Blog', icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
     )},
     { id: AppView.MED_REMINDERS, label: 'Prescriptions', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
@@ -48,10 +55,11 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
     { id: AppView.PROFILE, label: 'My Profile', icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
     )},
-    { id: AppView.ADMIN, label: 'Admin Panel', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-    )},
   ];
+
+  const handleNavClick = (viewId: AppView) => {
+    setView(viewId);
+  };
 
   return (
     <nav className="fixed bottom-0 w-full bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:relative md:w-64 md:h-screen md:border-r md:border-t-0 z-50 overflow-y-auto scrollbar-hide flex flex-col justify-between transition-colors duration-200 text-gray-900 dark:text-gray-100">
@@ -65,7 +73,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setView(item.id)}
+              onClick={() => handleNavClick(item.id)}
               className={`flex flex-col md:flex-row items-center md:space-x-3 p-3 md:px-4 md:py-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
                 currentView === item.id
                   ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-gray-700/50'
@@ -76,10 +84,30 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
               <span className="text-xs md:text-sm font-medium mt-1 md:mt-0 whitespace-nowrap">{item.label}</span>
             </button>
           ))}
+          {/* Mobile Admin Link */}
+          <button 
+            onClick={onAdminRequest}
+            className="md:hidden flex flex-col items-center p-3 rounded-xl text-gray-400 hover:text-teal-600 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            <span className="text-xs font-medium mt-1">Admin</span>
+          </button>
         </div>
       </div>
       
       <div className="hidden md:flex flex-col gap-2 p-4 border-t border-gray-100 dark:border-gray-700">
+        <button 
+          onClick={onAdminRequest}
+          className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${
+            currentView === AppView.ADMIN 
+              ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-gray-700/50' 
+              : 'text-gray-500 dark:text-gray-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 hover:text-teal-600 dark:hover:text-teal-400'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+          <span className="text-sm font-bold">Admin Portal</span>
+        </button>
+
         <button 
           onClick={toggleDarkMode}
           className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"

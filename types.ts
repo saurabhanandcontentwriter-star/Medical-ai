@@ -42,7 +42,9 @@ export enum AppView {
   TRACKING = 'TRACKING',
   PROFILE = 'PROFILE',
   ADMIN = 'ADMIN',
-  MED_REMINDERS = 'MED_REMINDERS'
+  MED_REMINDERS = 'MED_REMINDERS',
+  VIDEO_CONSULT = 'VIDEO_CONSULT',
+  BLOG = 'BLOG'
 }
 
 export interface MedicationReminder {
@@ -121,6 +123,7 @@ export interface UserProfile {
   name: string;
   email: string;
   avatar?: string;
+  totalTimeSpent?: number; // In seconds
 }
 
 export interface HealthNewsItem {
@@ -148,4 +151,16 @@ export interface YogaSession {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   focus: string;
   poses: string[];
+}
+
+export interface BlogArticle {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  author: string;
+  readTime: string;
+  category: string;
+  image: string;
+  date: string;
 }

@@ -20,7 +20,6 @@ export const sendMessageToGemini = async (
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Using the official Chat API for conversational continuity
     const chat = ai.chats.create({
       model: 'gemini-3-flash-preview',
       config: {
@@ -28,13 +27,185 @@ export const sendMessageToGemini = async (
       },
     });
 
-    // Send message through the chat session
     const response = await chat.sendMessage({ message: newMessage });
 
     return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
   } catch (error) {
     console.error("Error communicating with Gemini:", error);
     return "I apologize, but I'm having trouble connecting to the medical database right now. Please check your connection.";
+  }
+};
+
+export const generateDoctorAvatar = async (gender: 'male' | 'female'): Promise<string | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `A professional, empathetic, and trustworthy ${gender} doctor, wearing a clean modern white clinical coat, professional lighting, photorealistic 4k high quality, neutral clinical background. Looking friendly and directly at the camera.`;
+    
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error generating doctor avatar:", error);
+    return null;
+  }
+};
+
+export const generateConsultationSummary = async (transcript: string): Promise<string> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Please summarize the following medical consultation transcript into structured doctor's notes. 
+      Include sections for: 
+      1. Chief Complaint/Observations
+      2. Key Discussion Points
+      3. Preliminary Advice (with AI disclaimer)
+      4. Suggested Next Steps.
+      
+      Transcript:
+      ${transcript}`,
+      config: {
+        systemInstruction: "You are a professional medical scribe. Your task is to extract clinical relevance from conversational transcripts. Be concise and professional.",
+      }
+    });
+
+    return response.text || "Could not generate summary.";
+  } catch (error) {
+    console.error("Error generating summary:", error);
+    return "Failed to generate session summary. Please check your connection.";
+  }
+};
+
+export const fetchPoseDetails = async (poseName: string): Promise<{description: string, benefits: string[]}> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Provide a detailed explanation of the yoga pose: ${poseName}. 
+      Include a short description and a list of 3 key benefits. 
+      Return as JSON.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            description: { type: Type.STRING },
+            benefits: { type: Type.ARRAY, items: { type: Type.STRING } }
+          }
+        }
+      }
+    });
+    const text = response.text;
+    return text ? JSON.parse(text) : { description: "Detailed instructions coming soon.", benefits: [] };
+  } catch (error) {
+    console.error("Error fetching pose details:", error);
+    return { description: "Our AI instructor will guide you through this pose verbally.", benefits: ["Increased flexibility", "Core strength", "Mental clarity"] };
+  }
+};
+
+export const generateYogaTeacherImage = async (gender: 'male' | 'female', focus: string): Promise<string | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `A professional, photorealistic AI yoga instructor (${gender}), athletic build, wearing sleek modern yoga attire, standing in a serene minimalist zen yoga studio, natural lighting, soft shadows, looking at camera, high quality 4k render. The instructor is specialized in ${focus}.`;
+    
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    });
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error generating yoga teacher:", error);
+    return null;
+  }
+};
+
+export const generateYogaStepVideo = async (
+  gender: 'male' | 'female', 
+  poseName: string, 
+  onStatusUpdate: (msg: string) => void
+): Promise<string | null> => {
+  try {
+    // Create new instance right before the call to ensure latest API key
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    onStatusUpdate("Synthesizing movement patterns...");
+
+    const prompt = `A photorealistic high-quality video of a professional yoga instructor (${gender}) performing the ${poseName} pose perfectly. Cinematic lighting, 4k resolution, serene studio background, slow and controlled movement.`;
+
+    let operation;
+    try {
+      operation = await ai.models.generateVideos({
+        model: 'veo-3.1-fast-generate-preview',
+        prompt: prompt,
+        config: {
+          numberOfVideos: 1,
+          resolution: '720p',
+          aspectRatio: '16:9'
+        }
+      });
+    } catch (apiError: any) {
+      // Robust error checking for API key issues
+      const errMessage = apiError?.message || String(apiError);
+      if (errMessage.toLowerCase().includes("requested entity was not found") || 
+          errMessage.includes("404") || 
+          errMessage.toLowerCase().includes("api key")) {
+        throw new Error("API_KEY_REQUIRED");
+      }
+      throw apiError;
+    }
+
+    const statusMessages = [
+      "Analyzing anatomical alignment...",
+      "Rendering fluid motion...",
+      "Optimizing visual fidelity...",
+      "Finalizing your AI guide...",
+      "Almost there, zen is coming..."
+    ];
+    let msgIdx = 0;
+
+    while (!operation.done) {
+      onStatusUpdate(statusMessages[msgIdx % statusMessages.length]);
+      msgIdx++;
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (downloadLink) {
+      const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  } catch (error: any) {
+    console.error("Error generating yoga video:", error);
+    if (error?.message === "API_KEY_REQUIRED") {
+      throw error;
+    }
+    return null;
   }
 };
 
@@ -69,7 +240,6 @@ export const generateSpeech = async (text: string, language: 'English' | 'Hindi'
   }
 };
 
-// Audio Decoding Helper Functions
 function decode(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -147,7 +317,6 @@ export const searchDoctors = async (
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
-        // Updated to use googleMaps tool as per place-based retrieval requirements
         tools: [{ googleMaps: {} }],
         systemInstruction: "You are a helpful medical assistant. When asked to find doctors, use Google Maps to find real places.",
       }
@@ -201,7 +370,7 @@ export const searchMedicines = async (query: string): Promise<Medicine[]> => {
       Include treatments for skin/face problems, hair issues, or dental care if relevant.
       Return structured JSON data.
       Include a realistic price in INR.
-      Category MUST be one of: 'Medicines', 'Supplements', 'Hygiene', 'Skin & Face', 'Hair Care', 'Dental'.`,
+      Category MUST be one of: 'Medicines', 'Supplements', 'Hygiene', 'Skin & Face', 'Hair Care', 'Dental', 'Ayurvedic'.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -271,8 +440,6 @@ export const fetchHealthNews = async (language: 'English' | 'Hindi' = 'English')
       IMPORTANT: All text fields (title, summary, category, source) MUST be in ${language}.
       Provide 6-8 news items as structured JSON.`,
       config: {
-        // Removed googleSearch tool because it is incompatible with application/json responseMimeType
-        // According to guidelines, response.text should not be parsed as JSON when grounding is enabled.
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -336,7 +503,7 @@ export const fetchYogaSessions = async (): Promise<YogaSession[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: "Generate 4 structured yoga sessions. Return as JSON.",
+      contents: "Generate 6 structured yoga sessions. One MUST be 'Surya Namaskar (Sun Salutation)' with its full 12 poses. Other sessions should cover 'Back Pain Relief', 'Morning Energy', 'Weight Loss', 'Mental Calm', and 'Core Strength'. Return as JSON.",
       config: {
         responseMimeType: "application/json",
         responseSchema: {

@@ -19,7 +19,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
   // Payment State
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
-  const categories = ['All', 'Medicines', 'Skin & Face', 'Hair Care', 'Dental', 'Hygiene', 'Supplements'];
+  const categories = ['All', 'Medicines', 'Ayurvedic', 'Skin & Face', 'Hair Care', 'Dental', 'Hygiene', 'Supplements'];
 
   // Expanded Default suggestions with soaps, handwashes, and problem-specific treatments
   const defaultMedicines: Medicine[] = [
@@ -29,6 +29,12 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
     { id: '4', name: 'Digene Gel', description: 'Antacid for acidity relief', price: 180, category: 'Medicines' },
     { id: '6', name: 'Volini Spray', description: 'Pain relief spray for muscles', price: 210, category: 'Medicines' },
     
+    // Ayurvedic
+    { id: 'a1', name: 'Ashwagandha Tablets', description: 'Herbal supplement for stress and anxiety relief', price: 299, category: 'Ayurvedic' },
+    { id: 'a2', name: 'Triphala Churna', description: 'Natural digestive and colon cleanser', price: 150, category: 'Ayurvedic' },
+    { id: 'a3', name: 'Chyawanprash (500g)', description: 'Traditional immunity booster and health tonic', price: 245, category: 'Ayurvedic' },
+    { id: 'a4', name: 'Tulsi Holy Basil Drops', description: 'Natural antioxidant for respiratory health', price: 195, category: 'Ayurvedic' },
+
     // Skin & Face
     { id: 'f1', name: 'Salicylic Acid Face Wash', description: 'Treats active acne and prevents breakouts', price: 349, category: 'Skin & Face' },
     { id: 'f2', name: 'Acne Clarifying Gel', description: 'Spot treatment for pimples and blemishes', price: 275, category: 'Skin & Face' },
@@ -134,7 +140,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search acne gel, hair fall serum, sensitivity toothpaste..."
+            placeholder="Search ashwagandha, acne gel, hair fall serum..."
             className="flex-1 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl px-4 py-3 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-teal-500"
           />
           <button 
@@ -173,6 +179,7 @@ const MedicineOrder: React.FC<MedicineOrderProps> = ({ onOrderComplete }) => {
                   med.category === 'Hair Care' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' :
                   med.category === 'Dental' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
                   med.category === 'Hygiene' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                  med.category === 'Ayurvedic' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' :
                   'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
                 }`}>
                   {med.category || 'General'}

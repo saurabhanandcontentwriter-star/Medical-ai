@@ -71,6 +71,13 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs}h ${mins}m ${secs}s`;
+  };
+
   return (
     <div className="p-6 pb-24 md:pb-6 max-w-5xl mx-auto w-full overflow-y-auto">
       {/* Header */}
@@ -128,6 +135,15 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{formData.name}</h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">{formData.email}</p>
+            
+            {/* Time Tracking Metric */}
+            <div className="w-full bg-teal-50 dark:bg-teal-900/20 p-4 rounded-xl mb-6 border border-teal-100 dark:border-teal-800">
+               <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest mb-1">Total Health Journey</p>
+               <p className="text-lg font-black text-teal-700 dark:text-teal-200">
+                {user?.totalTimeSpent ? formatTime(user.totalTimeSpent) : '0h 0m 0s'}
+               </p>
+            </div>
+
             <div className="flex gap-2 mb-6">
               <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-bold rounded-full uppercase tracking-wide">Patient</span>
               <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-bold rounded-full">{formData.bloodGroup}</span>
@@ -166,7 +182,6 @@ const Profile: React.FC<ProfileProps> = ({ user }) => {
 
         {/* Right Column - Details Form */}
         <div className="md:col-span-2 space-y-6">
-          {/* ... (rest of the file remains the same) */}
           {/* Personal Information */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-2 border-b border-gray-50 dark:border-gray-700">Personal Information</h3>

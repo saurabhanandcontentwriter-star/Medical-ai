@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navigation from './components/Navigation';
 import Dashboard from './components/Dashboard';
 import SymptomChat from './components/SymptomChat';
@@ -16,15 +16,43 @@ import AdminPanel from './components/AdminPanel';
 import FloatingChatbot from './components/FloatingChatbot';
 import Login from './components/Login';
 import MedicationReminders from './components/MedicationReminders';
+import VideoConsultation from './components/VideoConsultation';
+import HealthBlog from './components/HealthBlog';
 import { AppView, AppNotification, Message, Sender, OrderItem, UserProfile, MedicationReminder } from './types';
 
 function App() {
   // Auth State
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('medassist_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Time tracking logic
+  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(() => {
+    const saved = localStorage.getItem('medassist_total_time');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      setTotalTimeSpent(prev => {
+        const next = prev + 10;
+        localStorage.setItem('medassist_total_time', next.toString());
+        return next;
+      });
+    }, 10000); // Track every 10 seconds
+    return () => clearInterval(interval);
+  }, [user]);
 
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
   
+  // Admin Auth State
+  const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
+  const [adminPin, setAdminPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+
   // Theme State
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -63,7 +91,6 @@ function App() {
     const saved = localStorage.getItem('medassist_reminders');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Reset isTakenToday if it's a new day
       const today = new Date().toDateString();
       return parsed.map((r: MedicationReminder) => ({
         ...r,
@@ -81,7 +108,6 @@ function App() {
     setReminders(updatedReminders);
   };
 
-  // Initial dummy data for orders/tracking
   const [orders, setOrders] = useState<OrderItem[]>([
     {
       id: '1001',
@@ -89,7 +115,7 @@ function App() {
       title: 'Monthly Meds',
       details: 'Metformin 500mg, Atorvastatin 10mg',
       amount: 450,
-      date: new Date(Date.now() - 86400000 * 2), // 2 days ago
+      date: new Date(Date.now() - 86400000 * 2), 
       status: 'Out for Delivery',
       deliveryAgent: {
         name: 'Ravi Kumar',
@@ -152,103 +178,100 @@ function App() {
 
   const handleLogin = (newUser: UserProfile) => {
     setUser(newUser);
+    localStorage.setItem('medassist_user', JSON.stringify(newUser));
   };
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('medassist_user');
     setCurrentView(AppView.DASHBOARD);
   };
 
-  // Handlers
-  const handleMedicineOrderComplete = (itemNames: string[], amount: number) => {
-    const itemList = itemNames.join(', ');
-    const orderId = Math.floor(1000 + Math.random() * 9000).toString();
-    const now = new Date();
-
+  const handleDoctorAppointment = (doctorName: string, date: string, time: string, amount: number) => {
     const newOrder: OrderItem = {
-      id: orderId,
-      type: 'medicine',
-      title: 'Medicine Order',
-      details: itemList.length > 30 ? itemList.substring(0, 30) + '...' : itemList,
-      amount: amount,
-      date: now,
-      status: 'Placed',
-      deliveryAgent: {
-        name: 'Vikram Singh',
-        phone: '+91 98765 00000'
-      },
-      invoiceUrl: `#invoice-${orderId}`,
+      id: `APT-${Date.now()}`,
+      type: 'doctor_appointment',
+      title: `Appointment: ${doctorName}`,
+      details: `Scheduled for ${date} at ${time}`,
+      amount,
+      date: new Date(date),
+      status: 'Confirmed',
       steps: [
-        { label: 'Order Placed', timestamp: 'Just now', isCompleted: true },
-        { label: 'Confirmed', timestamp: 'Processing...', isCompleted: true },
+        { label: 'Booked', timestamp: new Date().toLocaleString(), isCompleted: true },
+        { label: 'Confirmed', timestamp: new Date().toLocaleString(), isCompleted: true },
+        { label: 'Visit Pending', isCompleted: false },
+      ]
+    };
+    setOrders(prev => [newOrder, ...prev]);
+    addNotification('Appointment Confirmed', `Your visit to ${doctorName} is set for ${date} at ${time}.`, 'order');
+    setCurrentView(AppView.TRACKING);
+  };
+
+  const handleMedicineOrderComplete = (itemNames: string[], amount: number) => {
+    const newOrder: OrderItem = {
+      id: `ORD-${Date.now()}`,
+      type: 'medicine',
+      title: 'Pharmacy Order',
+      details: itemNames.join(', '),
+      amount,
+      date: new Date(),
+      status: 'Order Placed',
+      steps: [
+        { label: 'Order Placed', timestamp: new Date().toLocaleString(), isCompleted: true },
+        { label: 'Confirmed', isCompleted: false },
         { label: 'Shipped', isCompleted: false },
-        { label: 'Out for Delivery', isCompleted: false },
         { label: 'Delivered', isCompleted: false },
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addChatMessage(`Your medicine order #${orderId} for ₹${amount} has been placed!`);
-    addNotification('Order Confirmed', `Order #${orderId} for ₹${amount} is confirmed.`, 'order');
+    addNotification('Medicine Order Placed', `We have received your order for ${itemNames.length} items.`, 'order');
+    setCurrentView(AppView.TRACKING);
   };
 
   const handleLabTestBookingComplete = (testName: string, date: string, amount: number) => {
-    const orderId = Math.floor(5000 + Math.random() * 5000).toString();
-    const now = new Date();
-
     const newOrder: OrderItem = {
-      id: orderId,
+      id: `LAB-${Date.now()}`,
       type: 'lab_test',
       title: testName,
-      details: `Scheduled: ${date}`,
-      amount: amount,
-      date: now,
+      details: 'Home Sample Collection',
+      amount,
+      date: new Date(date),
       status: 'Booked',
-      deliveryAgent: {
-        name: 'Suresh Tech',
-        phone: '+91 99881 23456'
-      },
-      invoiceUrl: `#invoice-${orderId}`,
       steps: [
-        { label: 'Booked', timestamp: 'Just now', isCompleted: true },
-        { label: 'Confirmed', timestamp: 'Processing...', isCompleted: true },
+        { label: 'Booked', timestamp: new Date().toLocaleString(), isCompleted: true },
+        { label: 'Confirmed', isCompleted: false },
         { label: 'Sample Collected', isCompleted: false },
         { label: 'Analyzing', isCompleted: false },
         { label: 'Report Ready', isCompleted: false },
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addChatMessage(`Your appointment for ${testName} is confirmed for ${date}.`);
-    addNotification('Booking Confirmed', `Lab Test #${orderId} booked for ${testName}.`, 'order');
+    addNotification('Lab Test Scheduled', `Your ${testName} is scheduled for collection on ${date}.`, 'order');
+    setCurrentView(AppView.TRACKING);
   };
 
-  const handleDoctorAppointment = (doctorName: string, date: string, time: string, amount: number) => {
-    const orderId = Math.floor(1000 + Math.random() * 9000).toString();
-    const now = new Date();
-
-    const newOrder: OrderItem = {
-      id: orderId,
-      type: 'doctor_appointment',
-      title: `Appt: ${doctorName}`,
-      details: `Scheduled: ${date} at ${time}`,
-      amount: amount,
-      date: now,
-      status: 'Confirmed',
-      deliveryAgent: {
-         name: 'Clinic Staff',
-         phone: '+91 98765 43210'
-      },
-      invoiceUrl: `#invoice-${orderId}`,
-      steps: [
-        { label: 'Booked', timestamp: 'Just now', isCompleted: true },
-        { label: 'Confirmed', timestamp: 'Just now', isCompleted: true },
-        { label: 'Reminder Sent', isCompleted: false },
-        { label: 'Visit Completed', isCompleted: false },
-      ]
-    };
-    setOrders(prev => [newOrder, ...prev]);
-    addChatMessage(`Appointment confirmed with ${doctorName} on ${date} at ${time}.`);
-    addNotification('Appointment Booked', `Doctor: ${doctorName}, Date: ${date}`, 'order');
+  const handlePinClick = (digit: string) => {
+    if (adminPin.length >= 4) return;
+    const newPin = adminPin + digit;
+    setAdminPin(newPin);
+    
+    if (newPin.length === 4) {
+      if (newPin === '1234') { // Secret PIN
+        setIsAdminAuthOpen(false);
+        setCurrentView(AppView.ADMIN);
+        setAdminPin('');
+        setPinError(false);
+      } else {
+        setPinError(true);
+        setTimeout(() => {
+          setAdminPin('');
+          setPinError(false);
+        }, 1000);
+      }
+    }
   };
+
+  const handlePinClear = () => setAdminPin('');
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -262,6 +285,57 @@ function App() {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors duration-200 text-gray-900 dark:text-gray-100">
+      
+      {/* Admin Auth Modal (Pop) */}
+      {isAdminAuthOpen && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className={`bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-10 shadow-2xl transition-transform duration-300 ${pinError ? 'animate-bounce' : ''}`}>
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-teal-100 dark:bg-teal-900/30 rounded-2xl flex items-center justify-center text-teal-600 dark:text-teal-400 mx-auto mb-4">
+                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              </div>
+              <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Admin Entry</h2>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Authorized Personnel Only</p>
+            </div>
+
+            <div className="flex justify-center gap-4 mb-10">
+              {[1, 2, 3, 4].map((i) => (
+                <div 
+                  key={i} 
+                  className={`w-4 h-4 rounded-full transition-all duration-300 ${adminPin.length >= i ? 'bg-teal-600 scale-125' : 'bg-gray-200 dark:bg-gray-700'}`}
+                ></div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'X'].map((key) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (key === 'C') handlePinClear();
+                    else if (key === 'X') setIsAdminAuthOpen(false);
+                    else handlePinClick(key);
+                  }}
+                  className={`h-16 rounded-2xl font-black text-xl flex items-center justify-center transition-all active:scale-95 ${
+                    key === 'X' ? 'bg-rose-50 text-rose-500 dark:bg-rose-900/20' : 
+                    key === 'C' ? 'bg-gray-50 text-gray-400 dark:bg-gray-700' : 
+                    'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-teal-50 dark:hover:bg-teal-900/30 hover:text-teal-600'
+                  }`}
+                >
+                  {key === 'X' ? (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  ) : key}
+                </button>
+              ))}
+            </div>
+
+            {pinError && (
+              <p className="text-center mt-6 text-rose-500 font-bold text-xs uppercase tracking-widest animate-pulse">Incorrect Access Key</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Disclaimer Modal */}
       {showDisclaimer && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -286,85 +360,116 @@ function App() {
         </div>
       )}
 
-      {/* Notification Bell */}
-      <div className="fixed top-4 right-4 z-[60]">
+      {/* Header Controls (Admin & Notifications) */}
+      <div className="fixed top-4 right-4 z-[60] flex items-center gap-3">
+        {/* Admin Quick Access Button */}
         <button 
-          onClick={() => {
-            setIsNotificationOpen(!isNotificationOpen);
-            if (!isNotificationOpen) markAllRead();
-          }}
-          className="relative p-2.5 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all border border-gray-100 dark:border-gray-700"
+          onClick={() => setIsAdminAuthOpen(true)}
+          className="p-2.5 bg-white dark:bg-gray-800 text-teal-600 dark:text-teal-400 rounded-full shadow-md hover:bg-teal-50 dark:hover:bg-teal-900/30 transition-all border border-gray-100 dark:border-gray-700 group"
+          title="Admin Settings"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-          {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">
-              {unreadCount}
-            </span>
-          )}
+          <svg className="w-6 h-6 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
         </button>
 
-        {/* Notification Dropdown */}
-        {isNotificationOpen && (
-          <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2">
-            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
-              <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
-              <span className="text-xs text-gray-500 dark:text-gray-400">{notifications.length} Total</span>
-            </div>
-            <div className="max-h-96 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">
-                  <p>No notifications yet.</p>
-                </div>
-              ) : (
-                notifications.map(notif => (
-                  <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/20'}`}>
-                    <div className="flex gap-3">
-                      <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'order' ? 'bg-green-500' : 'bg-teal-500'}`}></div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{notif.title}</h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{notif.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-2">{notif.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+        {/* Notification Bell */}
+        <div className="relative">
+          <button 
+            onClick={() => {
+              setIsNotificationOpen(!isNotificationOpen);
+              if (!isNotificationOpen) markAllRead();
+            }}
+            className="p-2.5 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all border border-gray-100 dark:border-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {isNotificationOpen && (
+            <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
+                <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{notifications.length} Total</span>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">
+                    <p>No notifications yet.</p>
+                  </div>
+                ) : (
+                  notifications.map(notif => (
+                    <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30 dark:bg-blue-900/20'}`}>
+                      <div className="flex gap-3">
+                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'order' ? 'bg-green-500' : 'bg-teal-500'}`}></div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{notif.title}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{notif.message}</p>
+                          <p className="text-[10px] text-gray-400 mt-2">{notif.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Navigation */}
       <Navigation 
         currentView={currentView} 
         setView={setCurrentView} 
         onLogout={handleLogout} 
         isDarkMode={isDarkMode}
         toggleDarkMode={toggleDarkMode}
+        onAdminRequest={() => setIsAdminAuthOpen(true)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative">
-        {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
-        {currentView === AppView.MED_REMINDERS && <MedicationReminders reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
-        {currentView === AppView.CHAT && <SymptomChat />}
-        {currentView === AppView.ANALYZER && <ReportAnalyzer />}
-        {currentView === AppView.DOCTOR_FINDER && <DoctorFinder onBookAppointment={handleDoctorAppointment} />}
-        {currentView === AppView.ORDER_MEDICINE && (
-          <MedicineOrder onOrderComplete={handleMedicineOrderComplete} />
-        )}
-        {currentView === AppView.BOOK_TEST && (
-          <LabTestBooking onBookingComplete={handleLabTestBookingComplete} />
-        )}
-        {currentView === AppView.HEALTH_NEWS && <HealthNews />}
-        {currentView === AppView.HEALTH_TIPS && <HealthTips />}
-        {currentView === AppView.YOGA && <YogaSessions />}
-        {currentView === AppView.TRACKING && <OrderTracking orders={orders} />}
-        {currentView === AppView.PROFILE && <Profile user={user} />}
-        {currentView === AppView.ADMIN && <AdminPanel />}
+      <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative flex flex-col">
+        <div className="flex-1">
+          {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
+          {currentView === AppView.MED_REMINDERS && <MedicationReminders reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
+          {currentView === AppView.VIDEO_CONSULT && <VideoConsultation />}
+          {currentView === AppView.CHAT && <SymptomChat />}
+          {currentView === AppView.ANALYZER && <ReportAnalyzer />}
+          {currentView === AppView.DOCTOR_FINDER && <DoctorFinder onBookAppointment={handleDoctorAppointment} />}
+          {currentView === AppView.ORDER_MEDICINE && (
+            <MedicineOrder onOrderComplete={handleMedicineOrderComplete} />
+          )}
+          {currentView === AppView.BOOK_TEST && (
+            <LabTestBooking onBookingComplete={handleLabTestBookingComplete} />
+          )}
+          {currentView === AppView.HEALTH_NEWS && <HealthNews />}
+          {currentView === AppView.BLOG && <HealthBlog />}
+          {currentView === AppView.HEALTH_TIPS && <HealthTips />}
+          {currentView === AppView.YOGA && <YogaSessions />}
+          {currentView === AppView.TRACKING && <OrderTracking orders={orders} />}
+          {currentView === AppView.PROFILE && <Profile user={{...user!, totalTimeSpent}} />}
+          {currentView === AppView.ADMIN && <AdminPanel />}
+        </div>
 
-        {/* Floating Chatbot */}
-        {currentView !== AppView.CHAT && (
+        {/* Persistent Bottom Admin Section */}
+        <footer className="p-6 mt-auto border-t border-gray-100 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">© 2024 MedAssist AI. For educational purposes only.</p>
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setIsAdminAuthOpen(true)}
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-teal-600 transition-colors flex items-center"
+            >
+              <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              Secure Admin Access
+            </button>
+            <a href="#" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-gray-600 transition-colors">Privacy</a>
+            <a href="#" className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-gray-600 transition-colors">Terms</a>
+          </div>
+        </footer>
+
+        {currentView !== AppView.CHAT && currentView !== AppView.VIDEO_CONSULT && (
           <FloatingChatbot 
             messages={chatMessages} 
             setMessages={setChatMessages} 

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { OrderItem } from '../types';
 
@@ -7,6 +8,9 @@ interface OrderTrackingProps {
 
 const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
   const [previewDoc, setPreviewDoc] = useState<{ type: 'invoice' | 'report', order: OrderItem } | null>(null);
+  const [refundOrder, setRefundOrder] = useState<OrderItem | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundStep, setRefundStep] = useState<'form' | 'processing' | 'success'>('form');
 
   if (orders.length === 0) {
     return (
@@ -29,31 +33,56 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
 
   const downloadFile = () => {
     if (!previewDoc) return;
-    
-    // Create a dummy download
     const element = document.createElement("a");
     const fileContent = `MedAssist ${previewDoc.type === 'invoice' ? 'Invoice' : 'Report'}\nOrder ID: ${previewDoc.order.id}\nDate: ${previewDoc.order.date.toLocaleDateString()}\nTotal: Rs. ${previewDoc.order.amount}`;
     const file = new Blob([fileContent], {type: 'text/plain'});
     element.href = URL.createObjectURL(file);
     element.download = `MedAssist_${previewDoc.type}_${previewDoc.order.id}.txt`;
-    document.body.appendChild(element); // Required for this to work in FireFox
+    document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    
     closePreview();
+  };
+
+  const handleRefundRequest = () => {
+    if (!refundReason) return;
+    setRefundStep('processing');
+    setTimeout(() => {
+      setRefundStep('success');
+      // In a real app, we would update the order object state here
+    }, 2000);
+  };
+
+  const isEligibleForRefund = (order: OrderItem) => {
+    // Only medicine and lab tests within 7 days can be refunded if not already refunded
+    const diffDays = (new Date().getTime() - order.date.getTime()) / (1000 * 3600 * 24);
+    return order.type !== 'doctor_appointment' && diffDays < 7 && !order.status.toLowerCase().includes('refund');
   };
 
   return (
     <div className="p-6 pb-24 md:pb-6 max-w-5xl mx-auto w-full overflow-y-auto">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Track Orders</h1>
-        <p className="text-gray-500 dark:text-gray-400">Real-time status of your medicines and appointments.</p>
+      <header className="mb-8 flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Track Orders</h1>
+          <p className="text-gray-500 dark:text-gray-400">Real-time status of your medicines and appointments.</p>
+        </div>
+        <div className="bg-teal-50 dark:bg-teal-900/20 px-4 py-2 rounded-xl border border-teal-100 dark:border-teal-800">
+           <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Refund Policy</p>
+           <p className="text-xs font-bold text-teal-800 dark:text-teal-200">Eligible within 7 days</p>
+        </div>
       </header>
 
       <div className="space-y-6">
         {orders.map((order) => (
-          <div key={order.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-all hover:shadow-md">
+          <div key={order.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 transition-all hover:shadow-md relative overflow-hidden">
             
+            {/* Refund Status Banner */}
+            {order.status.toLowerCase().includes('refund') && (
+              <div className="absolute top-0 left-0 right-0 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] py-1 text-center">
+                Refund in Progress
+              </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
               <div className="flex items-start gap-4">
@@ -90,11 +119,8 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
 
             {/* Timeline Stepper */}
             <div className="relative mb-6">
-              {/* Desktop Horizontal Stepper */}
               <div className="hidden md:flex justify-between items-center relative z-10 px-4">
-                {/* Connecting Line background */}
                 <div className="absolute left-0 right-0 top-3 h-0.5 bg-gray-200 dark:bg-gray-700 -z-10 mx-8"></div>
-                {/* Progress Line */}
                  <div 
                    className="absolute left-0 top-3 h-0.5 bg-teal-500 -z-10 mx-8 transition-all duration-1000"
                    style={{ width: `${(order.steps.filter(s => s.isCompleted).length - 1) / (order.steps.length - 1) * 100}%` }}
@@ -119,17 +145,14 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
                 ))}
               </div>
 
-              {/* Mobile Vertical Stepper */}
               <div className="md:hidden space-y-0 pl-2">
                 {order.steps.map((step, idx) => (
                   <div key={idx} className="relative flex items-start pb-6 last:pb-0">
-                    {/* Vertical Line */}
                     {idx !== order.steps.length - 1 && (
                       <div className={`absolute left-[11px] top-6 bottom-0 w-0.5 ${
                         step.isCompleted && order.steps[idx + 1].isCompleted ? 'bg-teal-500' : 'bg-gray-200 dark:bg-gray-700'
                       }`}></div>
                     )}
-                    
                     <div className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center z-10 ${
                       step.isCompleted 
                         ? 'border-teal-500 bg-teal-500' 
@@ -149,15 +172,15 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
             </div>
 
             {/* Downloads & Actions */}
-            {(order.reportUrl || order.invoiceUrl) && (
-              <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap justify-between items-center gap-4">
+              <div className="flex flex-wrap gap-3">
                 {order.reportUrl && (
                   <button 
                     onClick={(e) => handlePreview(e, 'report', order)}
                     className="flex items-center px-4 py-2.5 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-xl text-sm font-medium hover:bg-teal-100 dark:hover:bg-teal-800 transition-colors border border-teal-100 dark:border-teal-800"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Download Report
+                    View Report
                   </button>
                 )}
                 {order.invoiceUrl && (
@@ -166,13 +189,26 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
                     className="flex items-center px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-200 dark:border-gray-600"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                    Download Invoice
+                    Invoice
                   </button>
                 )}
               </div>
-            )}
 
-            {/* Delivery Agent / Professional Details */}
+              {isEligibleForRefund(order) && (
+                <button 
+                  onClick={() => {
+                    setRefundOrder(order);
+                    setRefundStep('form');
+                    setRefundReason('');
+                  }}
+                  className="flex items-center px-4 py-2.5 text-rose-600 dark:text-rose-400 text-xs font-black uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" /></svg>
+                  Request Refund
+                </button>
+              )}
+            </div>
+
             {order.deliveryAgent && (
               <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900 p-4 rounded-xl">
                 <div className="flex items-center space-x-3">
@@ -197,11 +233,95 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
         ))}
       </div>
 
+      {/* Refund Process Modal */}
+      {refundOrder && (
+        <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 overflow-hidden animate-in zoom-in-95 duration-200">
+            {refundStep === 'form' && (
+              <>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-2">Request Refund</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 font-medium">Refund for order #{refundOrder.id}</p>
+                
+                <div className="space-y-6">
+                  <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-800 flex justify-between">
+                     <span className="text-rose-700 dark:text-rose-300 font-bold">Amount to be Refunded</span>
+                     <span className="text-rose-700 dark:text-rose-300 font-black">₹{refundOrder.amount}</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reason for Refund</label>
+                    <select 
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-700 border-0 rounded-2xl font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-rose-500"
+                    >
+                      <option value="">Select a reason</option>
+                      <option value="Incorrect Item">Incorrect Items Received</option>
+                      <option value="Damaged Product">Products Damaged/Leaking</option>
+                      <option value="Late Delivery">Delayed significantly</option>
+                      <option value="Better Price Elsewhere">Found better price elsewhere</option>
+                      <option value="Ordered by Mistake">Ordered by mistake</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-4 pt-4">
+                    <button 
+                      onClick={() => setRefundOrder(null)}
+                      className="flex-1 py-4 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-2xl font-black text-xs uppercase tracking-widest"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={handleRefundRequest}
+                      disabled={!refundReason}
+                      className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+                        !refundReason ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-rose-600 text-white shadow-lg shadow-rose-200'
+                      }`}
+                    >
+                      Submit Request
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {refundStep === 'processing' && (
+              <div className="text-center py-10 space-y-6">
+                <div className="w-20 h-20 border-4 border-rose-100 dark:border-rose-900 border-t-rose-600 rounded-full animate-spin mx-auto"></div>
+                <div>
+                  <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Validating Request</h4>
+                  <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest mt-2">Checking with payment gateway...</p>
+                </div>
+              </div>
+            )}
+
+            {refundStep === 'success' && (
+              <div className="text-center py-10 space-y-6 animate-in zoom-in duration-300">
+                <div className="w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+                  <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <div>
+                  <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Request Received</h4>
+                  <p className="text-gray-500 font-medium leading-relaxed max-w-xs mx-auto mt-4 text-sm">
+                    Your refund for <span className="text-gray-900 dark:text-white font-bold">₹{refundOrder.amount}</span> has been initiated. It may take 3-5 business days to reflect in your account.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setRefundOrder(null)}
+                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Document Preview Modal */}
       {previewDoc && (
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden transition-colors">
-            {/* Modal Header */}
             <div className="bg-gray-800 dark:bg-gray-900 text-white p-4 flex justify-between items-center">
               <h3 className="text-lg font-bold flex items-center">
                 {previewDoc.type === 'invoice' ? (
@@ -215,11 +335,8 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
               </button>
             </div>
 
-            {/* Modal Body - Simulated Document (keep white for readability of "paper") */}
             <div className="flex-1 overflow-y-auto p-8 bg-gray-100 dark:bg-gray-900">
               <div className="bg-white shadow-lg p-8 mx-auto max-w-lg min-h-[500px] text-sm text-gray-800">
-                
-                {/* Document Header */}
                 <div className="border-b-2 border-gray-100 pb-6 mb-6 flex justify-between items-start">
                   <div>
                     <div className="text-2xl font-bold text-teal-600 mb-1">MedAssist</div>
@@ -234,7 +351,6 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
                   </div>
                 </div>
 
-                {/* Patient/Customer Info */}
                 <div className="mb-8">
                   <p className="text-xs font-bold text-gray-400 uppercase mb-1">
                     {previewDoc.type === 'invoice' ? 'Billed To' : 'Patient Details'}
@@ -244,7 +360,6 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
                   <p className="text-gray-600">Patna, Bihar</p>
                 </div>
 
-                {/* Content based on Type */}
                 {previewDoc.type === 'invoice' ? (
                   <div className="space-y-4">
                     <table className="w-full mb-8">
@@ -299,7 +414,6 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
                         <span>Analyte B</span>
                         <span>0.8 <span className="text-xs text-gray-400">(0.5-1.2)</span></span>
                       </div>
-                      {/* Fake verified stamp */}
                       <div className="mt-8 border-2 border-green-500 text-green-500 font-bold uppercase text-xs inline-block px-4 py-1 rounded rotate-[-10deg] opacity-80">
                         Verified by Dr. Anita
                       </div>
@@ -307,17 +421,14 @@ const OrderTracking: React.FC<OrderTrackingProps> = ({ orders }) => {
                   </div>
                 )}
 
-                {/* Footer */}
                 <div className="text-center text-xs text-gray-400 mt-12 pt-6 border-t border-gray-100">
                   <p>Generated electronically by MedAssist AI.</p>
                   <p>This is a simulated document for demonstration purposes.</p>
                   <p className="mt-2 font-mono opacity-50">GSTIN: 10AAAAA0000A1Z5</p>
                 </div>
-
               </div>
             </div>
 
-            {/* Modal Actions */}
             <div className="bg-white dark:bg-gray-800 p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
               <button 
                 onClick={closePreview}
