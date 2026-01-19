@@ -27,6 +27,8 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [showWelcome, setShowWelcome] = useState(false);
+
   // Time tracking logic
   const [totalTimeSpent, setTotalTimeSpent] = useState<number>(() => {
     const saved = localStorage.getItem('medassist_total_time');
@@ -41,7 +43,7 @@ function App() {
         localStorage.setItem('medassist_total_time', next.toString());
         return next;
       });
-    }, 10000); // Track every 10 seconds
+    }, 10000); 
     return () => clearInterval(interval);
   }, [user]);
 
@@ -166,19 +168,10 @@ function App() {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
-  const addChatMessage = (text: string) => {
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      text,
-      sender: Sender.BOT,
-      timestamp: new Date()
-    };
-    setChatMessages(prev => [...prev, newMsg]);
-  };
-
   const handleLogin = (newUser: UserProfile) => {
     setUser(newUser);
     localStorage.setItem('medassist_user', JSON.stringify(newUser));
+    setShowWelcome(true);
   };
 
   const handleLogout = () => {
@@ -256,7 +249,7 @@ function App() {
     setAdminPin(newPin);
     
     if (newPin.length === 4) {
-      if (newPin === '1234') { // Secret PIN
+      if (newPin === '1234') { 
         setIsAdminAuthOpen(false);
         setCurrentView(AppView.ADMIN);
         setAdminPin('');
@@ -286,10 +279,65 @@ function App() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors duration-200 text-gray-900 dark:text-gray-100">
       
+      {/* Welcome Pop Modal */}
+      {showWelcome && (
+        <div className="fixed inset-0 z-[300] bg-teal-900/90 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-500">
+          <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-700 delay-200">
+            <div className="flex flex-col md:flex-row">
+               <div className="md:w-1/3 bg-teal-600 p-8 flex flex-col justify-between text-white relative">
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><span className="text-8xl">🏥</span></div>
+                  <div className="relative z-10">
+                     <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-2xl mb-6">✨</div>
+                     <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Welcome,<br/>{user.name.split(' ')[0]}</h2>
+                  </div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">MedAssist AI V2.5</div>
+               </div>
+               <div className="md:w-2/3 p-10 space-y-8">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Your Health Intelligence Dashboard</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 font-medium">Explore the new features we've prepared for your medical journey.</p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                     <div className="flex gap-4 group">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">🤖</div>
+                        <div>
+                           <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">AI Report Analysis</p>
+                           <p className="text-[11px] text-gray-500 dark:text-gray-400">Upload reports to get instant clinical summaries.</p>
+                        </div>
+                     </div>
+                     <div className="flex gap-4 group">
+                        <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">📹</div>
+                        <div>
+                           <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Video Consultations</p>
+                           <p className="text-[11px] text-gray-500 dark:text-gray-400">Real-time face-to-face sessions with Virtual Experts.</p>
+                        </div>
+                     </div>
+                     <div className="flex gap-4 group">
+                        <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/30 text-teal-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">🛒</div>
+                        <div>
+                           <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-widest">Express Pharmacy</p>
+                           <p className="text-[11px] text-gray-500 dark:text-gray-400">Get medications and wellness kits at your door.</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  <button 
+                    onClick={() => setShowWelcome(false)}
+                    className="w-full bg-gray-900 dark:bg-teal-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.3em] shadow-xl hover:bg-black transition-all transform active:scale-95"
+                  >
+                    Start Experience
+                  </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Admin Auth Modal (Pop) */}
       {isAdminAuthOpen && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className={`bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-w-sm p-10 shadow-2xl transition-transform duration-300 ${pinError ? 'animate-bounce' : ''}`}>
+          <div className={`bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-10 shadow-2xl transition-transform duration-300 ${pinError ? 'animate-bounce' : ''}`}>
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-teal-100 dark:bg-teal-900/30 rounded-2xl flex items-center justify-center text-teal-600 dark:text-teal-400 mx-auto mb-4">
                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>

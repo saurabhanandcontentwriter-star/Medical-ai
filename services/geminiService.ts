@@ -149,11 +149,20 @@ export const generateYogaStepVideo = async (
   onStatusUpdate: (msg: string) => void
 ): Promise<string | null> => {
   try {
-    // Create new instance right before the call to ensure latest API key
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    onStatusUpdate("Synthesizing movement patterns...");
+    // Critical: Veo requires a paid billing-enabled API key selected by the user.
+    // Check if user has selected a key before attempting Veo generation.
+    // @ts-ignore
+    const hasKey = await window.aistudio.hasSelectedApiKey();
+    if (!hasKey) {
+      throw new Error("API_KEY_REQUIRED");
+    }
 
-    const prompt = `A photorealistic high-quality video of a professional yoga instructor (${gender}) performing the ${poseName} pose perfectly. Cinematic lighting, 4k resolution, serene studio background, slow and controlled movement.`;
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    onStatusUpdate("Synthesizing movement patterns with dynamic angles...");
+
+    const prompt = `A photorealistic high-quality video of a professional yoga instructor (${gender}) performing the ${poseName} pose perfectly. 
+    Features: Slow-motion movement, cinematic lighting, 4k resolution, serene studio background. 
+    Camera work: Starts with a front view, then smoothly pans to a side profile to show anatomical alignment, with a final close-up on hand/foot positioning.`;
 
     let operation;
     try {
@@ -167,11 +176,12 @@ export const generateYogaStepVideo = async (
         }
       });
     } catch (apiError: any) {
-      // Robust error checking for API key issues
       const errMessage = apiError?.message || String(apiError);
-      if (errMessage.toLowerCase().includes("requested entity was not found") || 
-          errMessage.includes("404") || 
-          errMessage.toLowerCase().includes("api key")) {
+      // PERMISSION_DENIED (403) or "Requested entity was not found" (404) often implies billing/key issues for Veo
+      if (errMessage.toLowerCase().includes("permission") || 
+          errMessage.toLowerCase().includes("requested entity was not found") || 
+          errMessage.includes("403") ||
+          errMessage.includes("404")) {
         throw new Error("API_KEY_REQUIRED");
       }
       throw apiError;
@@ -179,10 +189,10 @@ export const generateYogaStepVideo = async (
 
     const statusMessages = [
       "Analyzing anatomical alignment...",
-      "Rendering fluid motion...",
+      "Configuring dynamic camera path...",
+      "Rendering slow-motion fluid movement...",
       "Optimizing visual fidelity...",
-      "Finalizing your AI guide...",
-      "Almost there, zen is coming..."
+      "Finalizing your high-precision AI guide...",
     ];
     let msgIdx = 0;
 

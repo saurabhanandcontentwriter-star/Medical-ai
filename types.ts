@@ -75,6 +75,7 @@ export interface Medicine {
   description: string;
   price: number;
   category: string;
+  image?: string;
 }
 
 export interface LabTest {
