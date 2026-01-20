@@ -295,15 +295,12 @@ const DoctorFinder: React.FC<DoctorFinderProps> = ({ onBookAppointment }) => {
 
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[450px] z-0 relative">
+              {/* FIX: MapContainer props fixed by removing center/zoom and using MapUpdater helper */}
               <MapContainer 
-                center={center} 
-                zoom={14} 
                 style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={false}
               >
                 <MapUpdater center={center} zoom={14} />
                 <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 

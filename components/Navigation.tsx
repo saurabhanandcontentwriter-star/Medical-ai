@@ -51,10 +51,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
     )},
   ];
 
-  const handleNavClick = (viewId: AppView) => {
-    setView(viewId);
-  };
-
   return (
     <nav className="fixed bottom-0 w-full bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 md:relative md:w-64 md:h-screen md:border-r md:border-t-0 z-50 overflow-y-auto scrollbar-hide flex flex-col justify-between transition-colors duration-200 text-gray-900 dark:text-gray-100">
       <div className="flex md:flex-col justify-around md:justify-start md:h-full md:p-4">
@@ -67,7 +63,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => handleNavClick(item.id)}
+              onClick={() => setView(item.id)}
               className={`flex flex-col md:flex-row items-center md:space-x-3 p-3 md:px-4 md:py-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
                 currentView === item.id
                   ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-gray-700/50'
@@ -89,6 +85,26 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
       </div>
       
       <div className="hidden md:flex flex-col gap-2 p-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="p-2 mb-2 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest px-2 mb-2">Display Settings</p>
+          <button 
+            onClick={toggleDarkMode}
+            className="flex items-center justify-between w-full p-2.5 rounded-xl transition-all duration-200 hover:bg-white dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 hover:shadow-sm"
+          >
+            <div className="flex items-center space-x-3">
+              {isDarkMode ? (
+                <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" /></svg>
+              ) : (
+                <svg className="w-5 h-5 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+              )}
+              <span className="text-sm font-bold">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+            </div>
+            <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${isDarkMode ? 'bg-teal-500' : 'bg-gray-300'}`}>
+              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${isDarkMode ? 'translate-x-4.5' : 'translate-x-0.5'}`}></div>
+            </div>
+          </button>
+        </div>
+
         <button 
           onClick={onAdminRequest}
           className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${
@@ -99,18 +115,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           <span className="text-sm font-bold">Admin Portal</span>
-        </button>
-
-        <button 
-          onClick={toggleDarkMode}
-          className="flex items-center space-x-3 w-full p-3 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          {isDarkMode ? (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-          )}
-          <span className="text-sm font-medium">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
 
         <button 
