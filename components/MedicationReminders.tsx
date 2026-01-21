@@ -18,7 +18,9 @@ const MedicationReminders: React.FC<MedicationRemindersProps> = ({ reminders, on
   });
 
   const handleAddMed = () => {
-    if (!newMed.name) return;
+    // Validation: Ensure both name and dosage are non-empty strings
+    if (!newMed.name.trim() || !newMed.dosage.trim()) return;
+    
     const med: MedicationReminder = {
       id: Date.now().toString(),
       ...newMed,
@@ -171,7 +173,7 @@ const MedicationReminders: React.FC<MedicationRemindersProps> = ({ reminders, on
                   autoFocus
                   value={newMed.name}
                   onChange={e => setNewMed({...newMed, name: e.target.value})}
-                  className="w-full p-3.5 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 text-gray-900 dark:text-white font-bold" 
+                  className={`w-full p-3.5 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 text-gray-900 dark:text-white font-bold ${!newMed.name.trim() && 'ring-1 ring-inset ring-gray-200'}`} 
                   placeholder="e.g. Paracetamol"
                 />
               </div>
@@ -190,11 +192,13 @@ const MedicationReminders: React.FC<MedicationRemindersProps> = ({ reminders, on
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Dosage</label>
                   <input 
                     type="text" 
+                    required
                     value={newMed.dosage}
                     onChange={e => setNewMed({...newMed, dosage: e.target.value})}
-                    className="w-full p-3.5 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 text-gray-900 dark:text-white font-bold" 
+                    className={`w-full p-3.5 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 text-gray-900 dark:text-white font-bold ${!newMed.dosage.trim() && 'ring-2 ring-rose-300'}`} 
                     placeholder="1 Tablet"
                   />
+                  {!newMed.dosage.trim() && <p className="text-[9px] text-rose-500 font-bold mt-1 ml-1 uppercase">Dosage is required</p>}
                 </div>
               </div>
 
@@ -222,7 +226,12 @@ const MedicationReminders: React.FC<MedicationRemindersProps> = ({ reminders, on
 
             <button 
               onClick={handleAddMed}
-              className="w-full mt-8 bg-teal-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-teal-700 transition-all shadow-lg shadow-teal-200 dark:shadow-none"
+              disabled={!newMed.name.trim() || !newMed.dosage.trim()}
+              className={`w-full mt-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg ${
+                !newMed.name.trim() || !newMed.dosage.trim()
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                  : 'bg-teal-600 text-white hover:bg-teal-700 shadow-teal-200 dark:shadow-none'
+              }`}
             >
               Add Reminder
             </button>

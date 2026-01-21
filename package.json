@@ -14,7 +14,8 @@
     "recharts": "^3.6.0",
     "react": "^19.2.3",
     "leaflet": "1.9.4",
-    "react-leaflet": "4.2.1"
+    "react-leaflet": "4.2.1",
+    "jspdf": "^2.5.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

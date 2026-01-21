@@ -48,6 +48,14 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
   const waterGoal = 3000;
   const [isFollowing, setIsFollowing] = useState(true);
 
+  // Step Counter State
+  const [steps, setSteps] = useState(() => {
+    const saved = localStorage.getItem('medassist_steps');
+    return saved ? parseInt(saved, 10) : 6540;
+  });
+  const stepGoal = 10000;
+  const [isPedometerActive, setIsPedometerActive] = useState(false);
+
   // Default values set to Patna for immediate UI readiness
   const [location, setLocation] = useState({
     city: 'Patna',
@@ -70,6 +78,51 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
     aqiColor: 'bg-green-500'
   });
 
+  // Step Counter Logic using Accelerometer
+  useEffect(() => {
+    let accelerometer: any = null;
+    let lastMag = 0;
+    const threshold = 12; // Threshold for a "step" detection
+
+    const startPedometer = async () => {
+      try {
+        // @ts-ignore
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+          // iOS 13+ support
+          // @ts-ignore
+          const response = await DeviceMotionEvent.requestPermission();
+          if (response !== 'granted') return;
+        }
+
+        const handleMotion = (event: DeviceMotionEvent) => {
+          const acc = event.accelerationIncludingGravity;
+          if (!acc) return;
+          
+          const mag = Math.sqrt((acc.x || 0)**2 + (acc.y || 0)**2 + (acc.z || 0)**2);
+          const delta = Math.abs(mag - lastMag);
+          
+          if (delta > threshold) {
+            setSteps(prev => {
+              const next = prev + 1;
+              localStorage.setItem('medassist_steps', next.toString());
+              return next;
+            });
+            setIsPedometerActive(true);
+            setTimeout(() => setIsPedometerActive(false), 300);
+          }
+          lastMag = mag;
+        };
+
+        window.addEventListener('devicemotion', handleMotion);
+        return () => window.removeEventListener('devicemotion', handleMotion);
+      } catch (err) {
+        console.error("Step counter initialization failed:", err);
+      }
+    };
+
+    startPedometer();
+  }, []);
+
   const fetchRealHealthData = useCallback(async () => {
     setLocation(prev => ({ ...prev, loading: true }));
     
@@ -84,7 +137,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
         const stateStr = (addr.state || '').toUpperCase();
         const countryStr = (addr.country || 'INDIA').toUpperCase();
         
-        // Parallel fetch for weather and air quality
         const [weatherRes, aqiRes] = await Promise.all([
           fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`).catch(() => null),
           fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current_air_quality=true`).catch(() => null)
@@ -133,7 +185,6 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
 
     const handleError = (err: GeolocationPositionError) => {
       console.warn("Geolocation failed", err.message);
-      // Fail gracefully back to Patna
       setLocation(prev => ({ 
         ...prev, 
         city: 'Patna', 
@@ -145,16 +196,16 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(handleSuccess, handleError, { timeout: 8000, enableHighAccuracy: false });
     } else {
-      handleError({ code: 0, message: "Not supported", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as any);
+      handleError({ code: 0, message: "Not supported" } as any);
     }
   }, []);
 
   useEffect(() => {
-    // Initial fetch
     fetchRealHealthData();
   }, [fetchRealHealthData]);
 
   const waterProgress = Math.min(100, (waterIntake / waterGoal) * 100);
+  const stepProgress = Math.min(100, (steps / stepGoal) * 100);
   const adherence = reminders.length > 0 ? Math.round((reminders.filter(r => r.isTakenToday).length / reminders.length) * 100) : 0;
   const nextMed = reminders.filter(r => !r.isTakenToday).sort((a, b) => a.time.localeCompare(b.time))[0];
 
@@ -319,10 +370,32 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
            
            <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden group hover:scale-[1.02] transition-transform">
               <div className="relative z-10">
-                 <h3 className="text-xl font-black uppercase tracking-tighter mb-4">Daily Goal</h3>
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-black uppercase tracking-tighter">Step Tracker</h3>
+                    <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isPedometerActive ? 'bg-green-400 text-white animate-pulse' : 'bg-white/20'}`}>
+                       {isPedometerActive ? 'Live' : 'Active'}
+                    </div>
+                 </div>
                  <div className="space-y-4">
-                    <div className="flex justify-between text-xs font-bold uppercase tracking-widest"><span>Steps</span><span>6.5k / 10k</span></div>
-                    <div className="h-2 w-full bg-white/20 rounded-full overflow-hidden"><div className="h-full bg-white w-[65%]"></div></div>
+                    <div className="flex justify-between items-end">
+                       <span className="text-4xl font-black tracking-tighter">{(steps/1000).toFixed(1)}k</span>
+                       <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">/ {stepGoal/1000}k Goal</span>
+                    </div>
+                    <div className="h-2.5 w-full bg-white/20 rounded-full overflow-hidden">
+                       <div className="h-full bg-white transition-all duration-500 shadow-[0_0_10px_white]" style={{width: `${stepProgress}%`}}></div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                       <div className="text-[10px] font-black uppercase tracking-widest opacity-60">Today's Progress</div>
+                       <div className="flex gap-2">
+                          {/* Manual Increment for testing on non-mobile devices */}
+                          <button 
+                            onClick={() => setSteps(s => s + 100)}
+                            className="bg-white/10 hover:bg-white/20 p-1.5 rounded-lg transition-colors"
+                          >
+                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                          </button>
+                       </div>
+                    </div>
                  </div>
               </div>
               <span className="absolute -bottom-4 -right-4 text-9xl opacity-10 select-none pointer-events-none group-hover:rotate-12 transition-transform duration-700">🏃</span>

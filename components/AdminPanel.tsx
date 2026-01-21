@@ -177,7 +177,9 @@ const AdminPanel: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-gray-700 overflow-hidden">
             <div className="p-8 border-b border-slate-50 dark:border-gray-700 flex justify-between items-center">
               <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tighter">Recent Orders</h3>
-              <button className="text-[10px] font-black text-[#0d645f] uppercase tracking-[0.2em] hover:underline">View All Logs</button>
+              <button className="text-[10px] font-black text-[#0d645f] uppercase tracking-widest px-4 py-1 rounded-lg border-2 border-black bg-white dark:bg-gray-800 hover:bg-slate-50 transition-all shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:translate-y-0.5 active:shadow-none">
+                VIEW ALL LOGS
+              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">

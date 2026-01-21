@@ -106,7 +106,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, setView, onLogout,
         </div>
 
         <button 
-          onClick={onAdminRequest}
+          onClick={() => setView(AppView.ADMIN)}
           className={`flex items-center space-x-3 w-full p-3 rounded-xl transition-all duration-200 ${
             currentView === AppView.ADMIN 
               ? 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-gray-700/50' 
