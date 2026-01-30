@@ -29,6 +29,25 @@ export interface VitalSign {
   color: string;
 }
 
+export interface Language {
+  code: string;
+  name: string;
+  native: string;
+}
+
+export const SUPPORTED_LANGUAGES: Language[] = [
+  { code: 'English', name: 'English', native: 'English' },
+  { code: 'Hindi', name: 'Hindi', native: 'हिंदी' },
+  { code: 'Bengali', name: 'Bengali', native: 'বাংলা' },
+  { code: 'Telugu', name: 'Telugu', native: 'తెలుగు' },
+  { code: 'Marathi', name: 'Marathi', native: 'मराठी' },
+  { code: 'Tamil', name: 'Tamil', native: 'தமிழ்' },
+  { code: 'Gujarati', name: 'Gujarati', native: 'ગુજરાતી' },
+  { code: 'Kannada', name: 'Kannada', native: 'ಕನ್ನಡ' },
+  { code: 'Malayalam', name: 'Malayalam', native: 'മലയാളം' },
+  { code: 'Punjabi', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+];
+
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
   CHAT = 'CHAT',
@@ -44,7 +63,9 @@ export enum AppView {
   ADMIN = 'ADMIN',
   MED_REMINDERS = 'MED_REMINDERS',
   VIDEO_CONSULT = 'VIDEO_CONSULT',
-  BLOG = 'BLOG'
+  BLOG = 'BLOG',
+  AMBULANCE = 'AMBULANCE',
+  MEDICAL_COLLEGES = 'MEDICAL_COLLEGES'
 }
 
 export interface MedicationReminder {
@@ -108,7 +129,7 @@ export interface DeliveryAgent {
 
 export interface OrderItem {
   id: string;
-  type: 'medicine' | 'lab_test' | 'doctor_appointment';
+  type: 'medicine' | 'lab_test' | 'doctor_appointment' | 'ambulance';
   title: string;
   details: string; // comma separated items
   amount: number;
@@ -164,4 +185,18 @@ export interface BlogArticle {
   category: string;
   image: string;
   date: string;
+}
+
+export interface MedicalCollege {
+  id: string;
+  name: string;
+  city: string;
+  established: string;
+  type: 'Government' | 'Private';
+  seats: number;
+  rating: string;
+  image: string;
+  location: { lat: number; lng: number };
+  description: string;
+  website: string;
 }

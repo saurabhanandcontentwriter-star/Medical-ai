@@ -1,19 +1,19 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, Sender } from '../types';
+import { Message, Sender, Language } from '../types';
 import { sendMessageToGemini, generateSpeech, decodeAudioData } from '../services/geminiService';
 
 interface FloatingChatbotProps {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  language: Language;
 }
 
-const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages }) => {
+const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages, language }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
-  const [voiceLanguage, setVoiceLanguage] = useState<'English' | 'Hindi'>('English');
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
@@ -38,7 +38,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
     setIsLoading(true);
 
     try {
-      const response = await sendMessageToGemini(messages, userMsg.text);
+      const response = await sendMessageToGemini(messages, userMsg.text, language.code);
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         text: response,
@@ -63,7 +63,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
     setIsSpeaking(id);
 
     try {
-      const audioData = await generateSpeech(text, voiceLanguage);
+      const audioData = await generateSpeech(text, language.code);
       if (audioData) {
         if (!audioContextRef.current) {
           audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -107,14 +107,11 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
              <div className="flex items-center space-x-2">
                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                <div>
-                 <h3 className="font-bold text-sm">MedAssist Assistant</h3>
+                 <h3 className="font-bold text-sm">MedAssist ({language.native})</h3>
                </div>
              </div>
              <div className="flex items-center space-x-2">
-                <div className="flex bg-white/20 p-0.5 rounded-lg text-[10px]">
-                  <button onClick={() => setVoiceLanguage('English')} className={`px-2 py-0.5 rounded ${voiceLanguage === 'English' ? 'bg-white text-teal-700' : 'text-white'}`}>EN</button>
-                  <button onClick={() => setVoiceLanguage('Hindi')} className={`px-2 py-0.5 rounded ${voiceLanguage === 'Hindi' ? 'bg-white text-teal-700' : 'text-white'}`}>HI</button>
-                </div>
+                <div className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black uppercase tracking-widest">{language.code.substring(0, 2)}</div>
                 <button onClick={() => setIsOpen(false)} className="text-teal-100 hover:text-white">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
@@ -164,7 +161,7 @@ const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ messages, setMessages
                  value={input}
                  onChange={e => setInput(e.target.value)}
                  onKeyDown={e => e.key === 'Enter' && handleSend()}
-                 placeholder="Ask anything..."
+                 placeholder={`Type in ${language.native}...`}
                  className="flex-1 bg-transparent border-none focus:ring-0 text-sm px-3 py-2 text-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                />
                <button 

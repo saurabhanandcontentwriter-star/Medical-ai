@@ -3,13 +3,26 @@ import React, { useState, useEffect } from 'react';
 import { fetchHealthNews } from '../services/geminiService';
 import { HealthNewsItem } from '../types';
 
-const HealthNews: React.FC = () => {
+interface HealthNewsProps {
+  language?: string;
+}
+
+// Added language prop to handle preference from the main App state
+const HealthNews: React.FC<HealthNewsProps> = ({ language: propLanguage }) => {
   const [news, setNews] = useState<HealthNewsItem[]>([]);
   const [bookmarks, setBookmarks] = useState<HealthNewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [language, setLanguage] = useState<'English' | 'Hindi'>('English');
+  // Default to prop value or English
+  const [language, setLanguage] = useState<string>(propLanguage || 'English');
   const [view, setView] = useState<'all' | 'saved'>('all');
+
+  // Sync internal language state with parent prop updates
+  useEffect(() => {
+    if (propLanguage) {
+      setLanguage(propLanguage);
+    }
+  }, [propLanguage]);
 
   // Load bookmarks from localStorage on mount
   useEffect(() => {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { searchLabTests } from '../services/geminiService';
 import { LabTest } from '../types';
@@ -11,11 +12,10 @@ const LabTestBooking: React.FC<LabTestBookingProps> = ({ onBookingComplete }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [tests, setTests] = useState<LabTest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedTest, setSelectedTest] = useState<LabTest | null>(null); // For booking modal
+  const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [preferredDate, setPreferredDate] = useState('');
 
-  // Default suggestions
   const defaultTests: LabTest[] = [
     { id: '1', name: 'Full Body Checkup', description: 'Comprehensive health screening including CBC, Lipid Profile, Liver Function, and more.', price: 1499, preparation: '10-12 hours fasting required.' },
     { id: '2', name: 'Thyroid Profile', description: 'T3, T4, and TSH levels check.', price: 499, preparation: 'No special preparation needed.' },
@@ -24,40 +24,28 @@ const LabTestBooking: React.FC<LabTestBookingProps> = ({ onBookingComplete }) =>
     { id: '5', name: 'Vitamin D Test', description: 'Check for Vitamin D deficiency.', price: 899, preparation: 'No special preparation needed.' },
   ];
 
-  useEffect(() => {
-    setTests(defaultTests);
-  }, []);
+  useEffect(() => { setTests(defaultTests); }, []);
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      setTests(defaultTests);
-      return;
-    }
+    if (!searchQuery.trim()) { setTests(defaultTests); return; }
     setIsLoading(true);
     const results = await searchLabTests(searchQuery);
-    if (results.length > 0) {
-      setTests(results);
-    }
+    if (results.length > 0) setTests(results);
     setIsLoading(false);
   };
 
   const handleBook = (test: LabTest) => {
     setSelectedTest(test);
-    setPreferredDate(new Date().toISOString().split('T')[0]); // Default today
+    setPreferredDate(new Date().toISOString().split('T')[0]);
   };
 
-  const gst = selectedTest ? Math.round(selectedTest.price * 0.05) : 0; // 5% GST for health services
+  const gst = selectedTest ? Math.round(selectedTest.price * 0.05) : 0;
   const platformFee = selectedTest ? 25 : 0;
   const totalAmount = (selectedTest?.price || 0) + gst + platformFee;
 
   const handlePaymentSuccess = () => {
     setIsPaymentOpen(false);
-    
-    // Trigger callback to App.tsx
-    if (selectedTest) {
-      onBookingComplete(selectedTest.name, preferredDate, totalAmount);
-    }
-
+    if (selectedTest) onBookingComplete(selectedTest.name, preferredDate, totalAmount);
     setSelectedTest(null);
   };
 
@@ -69,124 +57,47 @@ const LabTestBooking: React.FC<LabTestBookingProps> = ({ onBookingComplete }) =>
           <p className="text-gray-500 dark:text-gray-400">Home sample collection by certified professionals.</p>
         </header>
 
-        {/* Search Bar */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 mb-8 flex gap-2">
-          <input 
-            type="text" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Search for tests (e.g., blood sugar, kidney function, vitamins)..."
-            className="flex-1 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl px-4 py-3 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-teal-500"
-          />
-          <button 
-            onClick={handleSearch}
-            disabled={isLoading}
-            className="bg-gray-900 dark:bg-gray-700 text-white px-6 rounded-xl font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-          >
-            {isLoading ? 'Searching...' : 'Find Tests'}
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} placeholder="Search for tests (e.g., blood sugar, kidney function, vitamins)..." className="flex-1 bg-gray-50 dark:bg-gray-700 border-0 rounded-xl px-4 py-3 text-gray-800 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-teal-500" />
+          <button onClick={handleSearch} disabled={isLoading} className="bg-gray-900 dark:bg-gray-700 text-white px-6 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
+            {isLoading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Find Tests'}
           </button>
         </div>
 
-        {/* Test List */}
         <div className="space-y-4">
-          {tests.map((test, idx) => (
+          {isLoading ? (
+            [1,2,3,4].map(i => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-6 animate-pulse">
+                <div className="flex justify-between mb-4">
+                   <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded w-1/3"></div>
+                   <div className="h-6 bg-gray-100 dark:bg-gray-700 rounded w-16"></div>
+                </div>
+                <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+                <div className="h-8 bg-gray-100 dark:bg-gray-700 rounded w-1/4"></div>
+              </div>
+            ))
+          ) : tests.map((test, idx) => (
             <div key={`${test.id}-${idx}`} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 hover:shadow-md transition-all flex flex-col md:flex-row justify-between md:items-center gap-4">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">{test.name}</h3>
-                  <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs px-2 py-1 rounded-lg font-medium">Home Collection</span>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{test.description}</p>
-                <div className="flex items-center text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-lg w-fit">
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  {test.preparation}
-                </div>
-              </div>
-              <div className="flex flex-row md:flex-col items-center md:items-end justify-between gap-4 min-w-[120px]">
-                <span className="text-xl font-bold text-gray-900 dark:text-white">₹{test.price}</span>
-                <button 
-                  onClick={() => handleBook(test)}
-                  className="bg-teal-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-teal-700 transition-colors w-full md:w-auto"
-                >
-                  Book Now
-                </button>
-              </div>
+              <div className="flex-1"><div className="flex items-center space-x-3 mb-2"><h3 className="font-bold text-gray-900 dark:text-white text-lg">{test.name}</h3><span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs px-2 py-1 rounded-lg font-medium">Home Collection</span></div><p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{test.description}</p><div className="flex items-center text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-lg w-fit"><svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{test.preparation}</div></div>
+              <div className="flex flex-row md:flex-col items-center md:items-end justify-between gap-4 min-w-[120px]"><span className="text-xl font-bold text-gray-900 dark:text-white">₹{test.price}</span><button onClick={() => handleBook(test)} className="bg-teal-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-teal-700 transition-colors w-full md:w-auto">Book Now</button></div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Booking Modal */}
       {selectedTest && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-md w-full p-8 shadow-2xl animate-fade-in">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirm Booking</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Complete your booking for <strong>{selectedTest.name}</strong>.</p>
-            
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirm Booking</h2><p className="text-gray-500 dark:text-gray-400 mb-6">Complete your booking for <strong>{selectedTest.name}</strong>.</p>
             <div className="space-y-4 mb-8">
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl space-y-2">
-                <div className="flex justify-between text-gray-800 dark:text-gray-200 text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Test Price</span>
-                  <span className="font-medium">₹{selectedTest.price}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Sample Collection</span>
-                  <span className="text-green-600 dark:text-green-400 font-medium">FREE</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-800 dark:text-gray-200">
-                  <span className="text-gray-600 dark:text-gray-400">Taxes (GST 5%)</span>
-                  <span>₹{gst}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-800 dark:text-gray-200">
-                  <span className="text-gray-600 dark:text-gray-400">Platform Fee</span>
-                  <span>₹{platformFee}</span>
-                </div>
-                <div className="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between font-bold text-gray-900 dark:text-white text-lg">
-                  <span>Total Payable</span>
-                  <span className="text-teal-600 dark:text-teal-400">₹{totalAmount}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Date</label>
-                <input 
-                  type="date" 
-                  value={preferredDate}
-                  onChange={(e) => setPreferredDate(e.target.value)}
-                  className="w-full p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-teal-500 text-gray-800 dark:text-white" 
-                />
-              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-xl space-y-2"><div className="flex justify-between text-gray-800 dark:text-gray-200 text-sm"><span className="text-gray-600 dark:text-gray-400">Test Price</span><span className="font-medium">₹{selectedTest.price}</span></div><div className="flex justify-between text-sm"><span className="text-gray-600 dark:text-gray-400">Sample Collection</span><span className="text-green-600 dark:text-green-400 font-medium">FREE</span></div><div className="flex justify-between text-sm text-gray-800 dark:text-gray-200"><span className="text-gray-600 dark:text-gray-400">Taxes (GST 5%)</span><span>₹{gst}</span></div><div className="flex justify-between text-sm text-gray-800 dark:text-gray-200"><span className="text-gray-600 dark:text-gray-400">Platform Fee</span><span>₹{platformFee}</span></div><div className="border-t border-gray-200 dark:border-gray-600 pt-2 flex justify-between font-bold text-gray-900 dark:text-white text-lg"><span>Total Payable</span><span className="text-teal-600 dark:text-teal-400">₹{totalAmount}</span></div></div>
+              <div><label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Date</label><input type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} className="w-full p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-teal-500 text-gray-800 dark:text-white" /></div>
             </div>
-
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setSelectedTest(null)}
-                className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => setIsPaymentOpen(true)}
-                className="flex-1 bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition-colors shadow-lg shadow-teal-200 dark:shadow-none"
-              >
-                Proceed to Pay
-              </button>
-            </div>
+            <div className="flex gap-3"><button onClick={() => setSelectedTest(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">Cancel</button><button onClick={() => setIsPaymentOpen(true)} className="flex-1 bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 shadow-lg">Proceed to Pay</button></div>
           </div>
         </div>
       )}
-
-      {/* Payment Modal */}
-      {selectedTest && (
-        <PaymentModal 
-          isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          onSuccess={handlePaymentSuccess}
-          amount={totalAmount}
-          title="Pay for Lab Test"
-        />
-      )}
+      {selectedTest && <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} onSuccess={handlePaymentSuccess} amount={totalAmount} title="Pay for Lab Test" />}
     </div>
   );
 };

@@ -19,15 +19,25 @@ import MedicationReminders from './components/MedicationReminders';
 import VideoConsultation from './components/VideoConsultation';
 import HealthBlog from './components/HealthBlog';
 import WelcomeModal from './components/WelcomeModal';
-import { AppView, AppNotification, Message, Sender, OrderItem, UserProfile, MedicationReminder } from './types';
+import AmbulanceBooking from './components/AmbulanceBooking';
+import MedicalColleges from './components/MedicalColleges';
+import { AppView, AppNotification, Message, Sender, OrderItem, UserProfile, MedicationReminder, Language, SUPPORTED_LANGUAGES } from './types';
 
-function App() {
+// Use default export function to ensure compatibility with index.tsx imports
+export default function App() {
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('medassist_user');
     return saved ? JSON.parse(saved) : null;
   });
 
   const [showWelcome, setShowWelcome] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<Language>(() => {
+    const saved = localStorage.getItem('medassist_lang');
+    return saved ? JSON.parse(saved) : SUPPORTED_LANGUAGES[0];
+  });
+
   const [totalTimeSpent, setTotalTimeSpent] = useState<number>(() => {
     const saved = localStorage.getItem('medassist_total_time');
     return saved ? parseInt(saved, 10) : 0;
@@ -44,6 +54,29 @@ function App() {
     }, 10000); 
     return () => clearInterval(interval);
   }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem('medassist_lang', JSON.stringify(selectedLanguage));
+  }, [selectedLanguage]);
+
+  // Fullscreen listener
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(e => console.error(e));
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
 
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
@@ -73,7 +106,6 @@ function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   
-  // Shared chatbot message state
   const [chatMessages, setChatMessages] = useState<Message[]>([
     {
       id: 'init',
@@ -211,6 +243,28 @@ function App() {
     setCurrentView(AppView.DASHBOARD);
   };
 
+  const handleAmbulanceBookingComplete = (type: string) => {
+    const newOrder: OrderItem = {
+      id: `SOS-${Date.now()}`,
+      type: 'ambulance',
+      title: `Emergency: ${type}`,
+      details: 'Free Emergency Dispatch Service',
+      amount: 0,
+      date: new Date(),
+      status: 'Ambulance En-Route',
+      steps: [
+        { label: 'Requested', timestamp: new Date().toLocaleString(), isCompleted: true },
+        { label: 'Dispatched', timestamp: new Date().toLocaleString(), isCompleted: true },
+        { label: 'En Route', isCompleted: true },
+        { label: 'Arrived', isCompleted: false },
+      ]
+    };
+    setOrders(prev => [newOrder, ...prev]);
+    addNotification('Ambulance Dispatched', `A ${type} is en-route to your location. Stay on the line if the driver calls.`, 'alert');
+    addChatBotMessage(`🚨 Emergency dispatch confirmed! A ${type} is on its way. Please stay calm and keep your phone line clear.`);
+    setTimeout(() => setCurrentView(AppView.TRACKING), 1000);
+  };
+
   const handleDoctorAppointment = (doctorName: string, date: string, time: string, amount: number) => {
     const newOrder: OrderItem = {
       id: `APT-${Date.now()}`,
@@ -312,6 +366,127 @@ function App() {
         />
       )}
 
+      {/* Top Utility Layer */}
+      <div className="fixed top-4 right-4 z-[60] flex items-center gap-3">
+        {/* Utility Bar from User Screenshot */}
+        <div className="flex items-center gap-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 transition-all">
+          <button 
+            onClick={() => setIsLanguageModalOpen(true)}
+            className="p-1.5 text-teal-600 hover:scale-110 transition-transform flex items-center gap-2"
+            title="Switch Language"
+          >
+            <span className="text-sm font-black uppercase tracking-tighter">{selectedLanguage.code.substring(0, 2)}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
+          </button>
+
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
+
+          <button 
+            onClick={() => setCurrentView(AppView.DASHBOARD)}
+            className="p-1.5 text-gray-400 hover:text-teal-600 transition-colors"
+            title="Layout View"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM9 20h6" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16" /></svg>
+          </button>
+          
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
+          
+          <button 
+            onClick={handleRefresh}
+            className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+            title="System Refresh"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          </button>
+
+          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
+
+          <button 
+            onClick={toggleFullscreen}
+            className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isFullscreen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5h-4m4 0v-4m0 4l-5-5" />
+              )}
+            </svg>
+          </button>
+        </div>
+
+        {/* Notifications */}
+        <div className="relative">
+          <button onClick={() => { setIsNotificationOpen(!isNotificationOpen); if (!isNotificationOpen) markAllRead(); }} className="p-2.5 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full shadow-lg hover:bg-gray-50 border border-gray-100 dark:border-gray-700 transition-all">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            {unreadCount > 0 && <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">{unreadCount}</span>}
+          </button>
+          {isNotificationOpen && (
+            <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
+                <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
+                <span className="text-xs text-gray-500">{notifications.length} Total</span>
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? <div className="p-8 text-center text-gray-400 text-sm">No notifications yet.</div> : notifications.map(notif => (
+                    <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}>
+                      <div className="flex gap-3">
+                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'order' ? 'bg-green-500' : 'bg-teal-500'}`}></div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{notif.title}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notif.message}</p>
+                          <p className="text-[10px] text-gray-400 mt-2">{notif.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Language Hub Modal */}
+      {isLanguageModalOpen && (
+        <div className="fixed inset-0 z-[200] bg-teal-950/80 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl animate-in zoom-in-95 duration-500 border border-teal-500/20">
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                   <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Language Hub</h2>
+                   <p className="text-sm text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest mt-1">Select your preferred Indian language</p>
+                </div>
+                <button onClick={() => setIsLanguageModalOpen(false)} className="bg-gray-100 dark:bg-gray-700 p-3 rounded-full text-gray-400 hover:text-rose-500 transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <button 
+                    key={lang.code}
+                    onClick={() => { setSelectedLanguage(lang); setIsLanguageModalOpen(false); }}
+                    className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-2 group ${selectedLanguage.code === lang.code ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30' : 'border-gray-50 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-teal-200'}`}
+                  >
+                    <span className={`text-2xl font-black transition-transform group-hover:scale-110 ${selectedLanguage.code === lang.code ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400'}`}>{lang.native}</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 group-hover:text-teal-600">{lang.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-teal-50 dark:bg-teal-900/10 p-6 rounded-3xl border-2 border-dashed border-teal-200 dark:border-teal-800">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-white dark:bg-gray-700 rounded-2xl flex items-center justify-center text-xl shadow-sm">🗣️</div>
+                  <div>
+                    <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest mb-1">AI Voice Feature</p>
+                    <p className="text-xs font-bold text-teal-800 dark:text-teal-200 leading-relaxed italic">The AI will now listen, speak, and write in {selectedLanguage.native} during all health sessions.</p>
+                  </div>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       {dueMedication && (
         <div className="fixed inset-0 z-[1000] bg-teal-950/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95 duration-500 border border-teal-500/20 text-center relative overflow-hidden">
@@ -349,6 +524,7 @@ function App() {
                 <div key={i} className={`w-4 h-4 rounded-full transition-all duration-300 ${adminPin.length >= i ? 'bg-teal-600 scale-125' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
               ))}
             </div>
+            {/* Fixed syntax error in Admin PIN pad layout */}
             <div className="grid grid-cols-3 gap-4">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'X'].map((key) => (
                 <button
@@ -358,13 +534,13 @@ function App() {
                     else if (key === 'X') setIsAdminAuthOpen(false);
                     else handlePinClick(key);
                   }}
-                  className={`h-16 rounded-2xl font-black text-xl flex items-center justify-center transition-all active:scale-95 ${
-                    key === 'X' ? 'bg-rose-50 text-rose-500 dark:bg-rose-900/20' : 
-                    key === 'C' ? 'bg-gray-50 text-gray-400 dark:bg-gray-700' : 
-                    'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-teal-50 dark:hover:bg-teal-900/30 hover:text-teal-600'
-                  }`}
+                  className="h-16 rounded-2xl font-black text-xl flex items-center justify-center transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  {key === 'X' ? <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg> : key}
+                  {key === 'X' ? (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : key}
                 </button>
               ))}
             </div>
@@ -386,50 +562,21 @@ function App() {
         </div>
       )}
 
-      <div className="fixed top-4 right-4 z-[60] flex items-center gap-3">
-        <div className="relative">
-          <button onClick={() => { setIsNotificationOpen(!isNotificationOpen); if (!isNotificationOpen) markAllRead(); }} className="p-2.5 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full shadow-md hover:bg-gray-50 border border-gray-100 dark:border-gray-700 transition-all">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-            {unreadCount > 0 && <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">{unreadCount}</span>}
-          </button>
-          {isNotificationOpen && (
-            <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2">
-              <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
-                <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
-                <span className="text-xs text-gray-500">{notifications.length} Total</span>
-              </div>
-              <div className="max-h-96 overflow-y-auto">
-                {notifications.length === 0 ? <div className="p-8 text-center text-gray-400 text-sm">No notifications yet.</div> : notifications.map(notif => (
-                    <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}>
-                      <div className="flex gap-3">
-                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'order' ? 'bg-green-500' : 'bg-teal-500'}`}></div>
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{notif.title}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notif.message}</p>
-                          <p className="text-[10px] text-gray-400 mt-2">{notif.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       <Navigation currentView={currentView} setView={setCurrentView} onLogout={handleLogout} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} onAdminRequest={() => setIsAdminAuthOpen(true)} />
 
-      <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative flex flex-col">
+      <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative flex flex-col pt-16 md:pt-0">
         <div className="flex-1">
           {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
           {currentView === AppView.MED_REMINDERS && <MedicationReminders reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
           {currentView === AppView.VIDEO_CONSULT && <VideoConsultation />}
-          {currentView === AppView.CHAT && <SymptomChat chatMessages={chatMessages} setChatMessages={setChatMessages} />}
+          {currentView === AppView.CHAT && <SymptomChat chatMessages={chatMessages} setChatMessages={setChatMessages} language={selectedLanguage} />}
           {currentView === AppView.ANALYZER && <ReportAnalyzer />}
           {currentView === AppView.DOCTOR_FINDER && <DoctorFinder onBookAppointment={handleDoctorAppointment} />}
           {currentView === AppView.ORDER_MEDICINE && <MedicineOrder onOrderComplete={handleMedicineOrderComplete} />}
           {currentView === AppView.BOOK_TEST && <LabTestBooking onBookingComplete={handleLabTestBookingComplete} />}
-          {currentView === AppView.HEALTH_NEWS && <HealthNews />}
+          {currentView === AppView.AMBULANCE && <AmbulanceBooking onBookingComplete={handleAmbulanceBookingComplete} />}
+          {currentView === AppView.MEDICAL_COLLEGES && <MedicalColleges language={selectedLanguage} />}
+          {currentView === AppView.HEALTH_NEWS && <HealthNews language={selectedLanguage.code} />}
           {currentView === AppView.BLOG && <HealthBlog />}
           {currentView === AppView.HEALTH_TIPS && <HealthTips />}
           {currentView === AppView.YOGA && <YogaSessions />}
@@ -444,11 +591,10 @@ function App() {
           <FloatingChatbot 
             messages={chatMessages} 
             setMessages={setChatMessages} 
+            language={selectedLanguage}
           />
         )}
       </main>
     </div>
   );
 }
-
-export default App;

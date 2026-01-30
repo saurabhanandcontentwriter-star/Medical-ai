@@ -11,11 +11,13 @@ CRITICAL RULES:
 2. If a situation seems life-threatening (chest pain, difficulty breathing, severe bleeding), urge the user to call emergency services immediately.
 3. Be empathetic, clear, and concise. Use markdown for readability.
 4. When analyzing medical reports (images), explain the findings in simple terms but remain objective.
+5. If a specific language is requested, respond strictly in that language.
 `;
 
 export const sendMessageToGemini = async (
   history: Message[],
-  newMessage: string
+  newMessage: string,
+  language: string = 'English'
 ): Promise<string> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -23,7 +25,7 @@ export const sendMessageToGemini = async (
     const chat = ai.chats.create({
       model: 'gemini-3-flash-preview',
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: `${SYSTEM_INSTRUCTION}\n\nIMPORTANT: You must respond in the following language: ${language}.`,
       },
     });
 
@@ -149,8 +151,6 @@ export const generateYogaStepVideo = async (
   onStatusUpdate: (msg: string) => void
 ): Promise<string | null> => {
   try {
-    // Critical: Veo requires a paid billing-enabled API key selected by the user.
-    // Check if user has selected a key before attempting Veo generation.
     // @ts-ignore
     const hasKey = await window.aistudio.hasSelectedApiKey();
     if (!hasKey) {
@@ -177,7 +177,6 @@ export const generateYogaStepVideo = async (
       });
     } catch (apiError: any) {
       const errMessage = apiError?.message || String(apiError);
-      // PERMISSION_DENIED (403) or "Requested entity was not found" (404) often implies billing/key issues for Veo
       if (errMessage.toLowerCase().includes("permission") || 
           errMessage.toLowerCase().includes("requested entity was not found") || 
           errMessage.includes("403") ||
@@ -219,12 +218,11 @@ export const generateYogaStepVideo = async (
   }
 };
 
-export const generateSpeech = async (text: string, language: 'English' | 'Hindi' = 'English'): Promise<Uint8Array | null> => {
+export const generateSpeech = async (text: string, language: string = 'English'): Promise<Uint8Array | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = language === 'Hindi' 
-      ? `हिंदी में बोलें: ${text}` 
-      : `Say clearly: ${text}`;
+    // Use the language context to prompt the TTS model for natural tone in that specific Indian language
+    const prompt = `Speak clearly and empathetic in ${language}: ${text}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -233,7 +231,8 @@ export const generateSpeech = async (text: string, language: 'English' | 'Hindi'
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: language === 'Hindi' ? 'Puck' : 'Kore' },
+            // Selecting Kore for general versatility across Indian language tonalities
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
       },
@@ -441,7 +440,7 @@ export const searchLabTests = async (query: string): Promise<LabTest[]> => {
   }
 };
 
-export const fetchHealthNews = async (language: 'English' | 'Hindi' = 'English'): Promise<HealthNewsItem[]> => {
+export const fetchHealthNews = async (language: string = 'English'): Promise<HealthNewsItem[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response: GenerateContentResponse = await ai.models.generateContent({
