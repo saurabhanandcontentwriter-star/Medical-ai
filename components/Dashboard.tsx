@@ -1,29 +1,25 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import { VitalSign, OrderItem, AppView, MedicationReminder } from '../types';
+import { VitalSign, AppView, MedicationReminder, OrderItem, MealEntry } from '../types';
 
-// Helper to keep map synced with state
-// Fixed: Explicitly defining props for the MapFocus component to resolve the "Expected 0 arguments, but got 1" error
-const MapFocus = ({ center, follow }: { center: [number, number], follow: boolean }) => {
+const MapFocus = ({ center }: { center: [number, number] }) => {
   const map = useMap();
   useEffect(() => {
-    if (follow) {
-      map.setView(center, 15);
-    }
-  }, [center, follow, map]);
+    map.setView(center, 15);
+  }, [center, map]);
   return null;
 };
 
 const initialHistoryData = [
-  { name: 'Mon', hr: 72, sys: 120, dia: 80, spo2: 98, temp: 98.4 },
-  { name: 'Tue', hr: 75, sys: 122, dia: 82, spo2: 97, temp: 98.6 },
-  { name: 'Wed', hr: 70, sys: 118, dia: 79, spo2: 99, temp: 98.5 },
-  { name: 'Thu', hr: 68, sys: 119, dia: 81, spo2: 98, temp: 98.3 },
-  { name: 'Fri', hr: 74, sys: 121, dia: 80, spo2: 98, temp: 98.7 },
-  { name: 'Sat', hr: 78, sys: 124, dia: 84, spo2: 97, temp: 98.6 },
-  { name: 'Sun', hr: 73, sys: 120, dia: 80, spo2: 98, temp: 98.5 },
+  { name: 'Mon', steps: 4500 },
+  { name: 'Tue', steps: 5200 },
+  { name: 'Wed', steps: 6100 },
+  { name: 'Thu', steps: 4800 },
+  { name: 'Fri', steps: 7200 },
+  { name: 'Sat', steps: 8500 },
+  { name: 'Sun', steps: 6540 },
 ];
 
 const initialVitals: VitalSign[] = [
@@ -34,22 +30,32 @@ const initialVitals: VitalSign[] = [
 ];
 
 interface DashboardProps {
-  orders?: OrderItem[];
   onNavigate?: (view: AppView) => void;
   reminders?: MedicationReminder[];
   onUpdateReminders?: (reminders: MedicationReminder[]) => void;
+  orders?: OrderItem[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {}, reminders = [], onUpdateReminders }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  onNavigate = () => {}, 
+  reminders = [], 
+  onUpdateReminders,
+  orders = []
+}) => {
   const [vitals] = useState<VitalSign[]>(initialVitals);
   const [historyData] = useState(initialHistoryData);
-  const [activeChartKey, setActiveChartKey] = useState<string>('hr');
   const [healthScore] = useState(88);
   const [waterIntake, setWaterIntake] = useState(1200);
   const waterGoal = 3000;
-  const [isFollowing, setIsFollowing] = useState(true);
+  
+  const [dailyCals, setDailyCals] = useState(() => {
+    const saved = localStorage.getItem('medassist_meals');
+    if (!saved) return 0;
+    const meals: MealEntry[] = JSON.parse(saved);
+    return meals.reduce((sum, m) => sum + m.calories, 0);
+  });
+  const calGoal = 2200;
 
-  // Step Counter State
   const [steps, setSteps] = useState(() => {
     const saved = localStorage.getItem('medassist_steps');
     return saved ? parseInt(saved, 10) : 6540;
@@ -57,109 +63,21 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
   const stepGoal = 10000;
   const [isPedometerActive, setIsPedometerActive] = useState(false);
 
-  // Location State
   const [location, setLocation] = useState({
     city: 'Patna',
     fullAddress: 'BIHAR, INDIA',
     coords: [25.5941, 85.1376] as [number, number],
-    details: {
-      postcode: '800001',
-      suburb: 'Kankarbagh',
-      state: 'Bihar',
-      district: 'Patna'
-    },
     loading: true
   });
 
-  // Edit Mode State
-  const [isEditingLocation, setIsEditingLocation] = useState(false);
-  const [isFetchingData, setIsFetchingData] = useState(false);
-  const [tempLocation, setTempLocation] = useState({
-    city: location.city,
-    postcode: location.details.postcode,
-    district: location.details.district,
-    suburb: location.details.suburb,
-    state: location.details.state,
-    coords: location.coords
-  });
-
-  const postcodeRef = useRef<HTMLInputElement>(null);
-
-  const [weather, setWeather] = useState({
-    temp: '28',
-    condition: 'SUNNY',
-    aqi: '42',
-    aqiLevel: 'GOOD',
-    aqiColor: 'bg-green-500'
-  });
-
-  // New Feature: Regional Health Insights
-  const [healthInsights, setHealthInsights] = useState({
-    hospitalCount: 14,
-    emergencyResponse: '8 mins',
-    coverageRating: '9.2',
-    riskLevel: 'LOW'
-  });
-
-  // Effect to auto-fetch when postcode reaches 6 digits
-  useEffect(() => {
-    if (isEditingLocation && tempLocation.postcode.length === 6) {
-      autoFetchLocationData(tempLocation.postcode);
-    }
-  }, [tempLocation.postcode, isEditingLocation]);
-
-  const autoFetchLocationData = async (code: string) => {
-    setIsFetchingData(true);
-    try {
-      const searchRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${code}&country=India`);
-      const searchData = await searchRes.json();
-
-      if (searchData && searchData.length > 0) {
-        const first = searchData[0];
-        const newCoords: [number, number] = [parseFloat(first.lat), parseFloat(first.lon)];
-        
-        const revRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newCoords[0]}&lon=${newCoords[1]}`);
-        const revData = await revRes.json();
-        
-        if (revData?.address) {
-          const addr = revData.address;
-          setTempLocation(prev => ({
-            ...prev,
-            city: addr.city || addr.town || addr.village || addr.suburb || prev.city,
-            district: addr.state_district || addr.county || prev.district,
-            state: addr.state || prev.state,
-            suburb: addr.suburb || addr.neighbourhood || addr.road || prev.suburb,
-            coords: newCoords
-          }));
-
-          // Simulate updating health insights for the new area
-          const hash = code.split('').reduce((acc, char) => acc + parseInt(char), 0);
-          setHealthInsights({
-            hospitalCount: 5 + (hash % 15),
-            emergencyResponse: `${6 + (hash % 8)} mins`,
-            coverageRating: (7 + (hash % 30) / 10).toFixed(1),
-            riskLevel: hash % 2 === 0 ? 'LOW' : 'MODERATE'
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Auto-fetch failed", e);
-    } finally {
-      setIsFetchingData(false);
-    }
-  };
-
-  // Step Counter Logic
   useEffect(() => {
     let lastMag = 0;
     const threshold = 12;
-
     const handleMotion = (event: DeviceMotionEvent) => {
       const acc = event.accelerationIncludingGravity;
       if (!acc) return;
       const mag = Math.sqrt((acc.x || 0)**2 + (acc.y || 0)**2 + (acc.z || 0)**2);
-      const delta = Math.abs(mag - lastMag);
-      if (delta > threshold) {
+      if (Math.abs(mag - lastMag) > threshold) {
         setSteps(prev => {
           const next = prev + 1;
           localStorage.setItem('medassist_steps', next.toString());
@@ -170,357 +88,317 @@ const Dashboard: React.FC<DashboardProps> = ({ orders = [], onNavigate = () => {
       }
       lastMag = mag;
     };
-
     window.addEventListener('devicemotion', handleMotion);
     return () => window.removeEventListener('devicemotion', handleMotion);
   }, []);
 
-  const fetchRealHealthData = useCallback(async () => {
+  const fetchLocation = useCallback(async () => {
     setLocation(prev => ({ ...prev, loading: true }));
-    const handleSuccess = async (pos: GeolocationPosition) => {
-      try {
-        const { latitude, longitude } = pos.coords;
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-        const geoData = await geoRes.json();
-        const addr = geoData?.address || {};
-        
-        const newDetails = {
-          postcode: addr.postcode || '800001',
-          suburb: addr.suburb || addr.neighbourhood || addr.road || 'City Center',
-          state: addr.state || 'Bihar',
-          district: addr.state_district || addr.county || 'Patna'
-        };
-
-        setLocation({
-          city: addr.city || addr.town || addr.suburb || "Current Location",
-          fullAddress: `${(addr.state || '').toUpperCase()}, ${(addr.country || 'INDIA').toUpperCase()}`,
-          coords: [latitude, longitude],
-          details: newDetails,
-          loading: false
-        });
-
-        setTempLocation({
-          city: addr.city || addr.town || addr.suburb || "Current Location",
-          postcode: newDetails.postcode,
-          district: newDetails.district,
-          suburb: newDetails.suburb,
-          state: newDetails.state,
-          coords: [latitude, longitude]
-        });
-      } catch (e) {
-        setLocation(prev => ({ ...prev, loading: false }));
-      }
-    };
-    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(handleSuccess, () => setLocation(p => ({ ...p, loading: false })));
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          setLocation({
+            city: data.address.city || data.address.town || "Current Location",
+            fullAddress: `${data.address.state.toUpperCase()}, INDIA`,
+            coords: [latitude, longitude],
+            loading: false
+          });
+        } catch (e) {
+          setLocation(prev => ({ ...prev, loading: false }));
+        }
+      }, () => setLocation(p => ({ ...p, loading: false })));
+    }
   }, []);
 
-  useEffect(() => { fetchRealHealthData(); }, [fetchRealHealthData]);
-
-  const handleSaveLocation = () => {
-    setLocation(prev => ({
-      ...prev,
-      city: tempLocation.city,
-      coords: tempLocation.coords,
-      details: {
-        ...prev.details,
-        postcode: tempLocation.postcode,
-        district: tempLocation.district,
-        suburb: tempLocation.suburb,
-        state: tempLocation.state
-      },
-      fullAddress: `${tempLocation.state.toUpperCase()}, INDIA`
-    }));
-    setIsEditingLocation(false);
-  };
-
-  const toggleEditMode = () => {
-    if (!isEditingLocation) {
-      setIsEditingLocation(true);
-      setTimeout(() => postcodeRef.current?.focus(), 50);
-    } else {
-      handleSaveLocation();
-    }
-  };
+  useEffect(() => { fetchLocation(); }, [fetchLocation]);
 
   const waterProgress = Math.min(100, (waterIntake / waterGoal) * 100);
+  const calProgress = Math.min(100, (dailyCals / calGoal) * 100);
   const stepProgress = Math.min(100, (steps / stepGoal) * 100);
-  const adherence = reminders.length > 0 ? Math.round((reminders.filter(r => r.isTakenToday).length / reminders.length) * 100) : 0;
-  const nextMed = reminders.filter(r => !r.isTakenToday).sort((a, b) => a.time.localeCompare(b.time))[0];
-
-  const Skeleton = ({ className }: { className: string }) => (
-    <div className={`bg-gray-200 dark:bg-gray-700 animate-pulse ${className}`}></div>
-  );
+  const adherence = reminders.length > 0 ? Math.round((reminders.filter(r => r.isTakenToday).length / reminders.length) * 100) : 100;
 
   return (
-    <div className="p-6 space-y-8 pb-24 md:pb-6 text-gray-900 dark:text-gray-100">
-      <header className="flex flex-wrap gap-4 items-center">
-        {location.loading ? (
-          <div className="flex gap-4 w-full md:w-auto">
-             <Skeleton className="h-14 w-60 rounded-2xl" />
-             <Skeleton className="h-14 w-44 rounded-2xl" />
-             <Skeleton className="h-14 w-40 rounded-2xl" />
+    <div className="p-4 md:p-8 space-y-8 pb-32 md:pb-8 max-w-[1600px] mx-auto transition-all duration-500">
+      
+      {/* 1. Immersive Header Section */}
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 bg-white dark:bg-slate-900/50 p-8 rounded-[3rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="space-y-2">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-teal-50 dark:bg-teal-900/30 rounded-3xl flex items-center justify-center text-3xl shadow-inner">👋</div>
+            <div>
+               <h1 className="text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">Good Morning, Rahul</h1>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
+                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                 System Status: Bio-Synced & Active
+               </p>
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[240px] justify-between transition-all hover:shadow-md">
-               <div className="flex items-center">
-                  <div className="mr-3 text-xl">📍</div>
-                  <div className="max-w-[150px]">
-                     <p className={`font-black text-teal-600 dark:text-teal-400 text-lg leading-tight truncate`}>{location.city}</p>
-                     <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest truncate mt-0.5">{location.fullAddress}</p>
-                  </div>
-               </div>
-               <button onClick={fetchRealHealthData} className="ml-2 text-gray-300 hover:text-teal-500 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-               </button>
-            </div>
-            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[180px] justify-between transition-all hover:shadow-md">
-              <div className="flex items-center">
-                <div className="mr-3"><img src="https://img.icons8.com/color/48/lungs.png" alt="AQI Icon" className={`w-8 h-8`} /></div>
-                <div>
-                  <p className="font-black text-xl leading-none text-slate-900 dark:text-white">{weather.aqi}</p>
-                  <p className={`text-[9px] font-black tracking-widest mt-1 ${weather.aqiColor.replace('bg-', 'text-')}`}>{weather.aqiLevel}</p>
-                </div>
-              </div>
-              <div className={`ml-4 w-3 h-3 rounded-full ${weather.aqiColor} animate-pulse`}></div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-5 py-3 rounded-2xl shadow-sm flex items-center min-w-[170px] justify-between transition-all hover:shadow-md">
-              <div className="flex items-center">
-                <div className="mr-3 text-2xl">{weather.condition === 'RAINING' ? '🌧️' : '☀️'}</div>
-                <div>
-                  <p className="font-black text-xl leading-none">{weather.temp}°C</p>
-                  <p className="text-[9px] text-gray-400 uppercase font-black tracking-widest mt-1">{weather.condition}</p>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <button 
+            onClick={fetchLocation}
+            className="bg-slate-50 dark:bg-slate-800 px-6 py-4 rounded-[1.8rem] flex items-center gap-4 hover:shadow-lg transition-all group border border-slate-100 dark:border-slate-700"
+          >
+             <div className="text-xl group-hover:scale-125 transition-transform duration-500">📍</div>
+             <div className="text-left">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Current Zone</p>
+                <p className="text-sm font-black text-slate-800 dark:text-teal-400 uppercase tracking-tight">{location.loading ? 'Locating...' : location.city}</p>
+             </div>
+          </button>
+
+          <button 
+            onClick={() => onNavigate(AppView.HEALTH_NEWS)}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-4 rounded-[1.8rem] shadow-xl shadow-rose-200 dark:shadow-none flex items-center gap-4 transition-all transform hover:scale-105 active:scale-95"
+          >
+             <div className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+             </div>
+             <div className="text-left">
+                <p className="text-[9px] font-black uppercase tracking-widest leading-none opacity-80 mb-1">Critical Update</p>
+                <p className="text-xs font-black uppercase tracking-tight">Active Outbreak Monitor</p>
+             </div>
+          </button>
+        </div>
       </header>
 
-      <section className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            {location.loading ? (
-              <Skeleton className="h-[400px] md:col-span-2 rounded-[2.5rem]" />
-            ) : (
-              <>
-                <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden relative group h-[400px]">
-                   <div className="absolute top-6 left-6 z-[20] flex flex-col gap-2">
-                      <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
-                        <h3 className="text-sm font-black uppercase tracking-tighter text-teal-600">Live Health Zone</h3>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Accuracy: High Precision</p>
-                      </div>
-                   </div>
-                   <div className="h-full w-full z-0">
-                      {/* Fixed: MapFocus handles view management */}
-                      <MapContainer style={{ height: '100%', width: '100%' }}>
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <Marker position={isEditingLocation ? tempLocation.coords : location.coords} />
-                        <MapFocus center={isEditingLocation ? tempLocation.coords : location.coords} follow={isFollowing} />
-                      </MapContainer>
-                   </div>
-                </div>
-
-                <div className="space-y-6">
-                   <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 h-full flex flex-col transition-all duration-300">
-                      <div className="flex justify-between items-center mb-8">
-                         <h3 className="text-xl font-black uppercase tracking-tighter">Location Details</h3>
-                         <div className="flex items-center gap-3">
-                           {!isEditingLocation ? (
-                              <button onClick={toggleEditMode} className="p-2 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded-full transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
-                           ) : (
-                              <div className="flex gap-2">
-                                <button onClick={() => setIsEditingLocation(false)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-full transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                                <button onClick={handleSaveLocation} className="p-2 text-green-500 hover:bg-green-900/10 rounded-full transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></button>
-                              </div>
-                           )}
-                           <span className={`w-3 h-3 bg-green-500 rounded-full ${isEditingLocation ? 'animate-pulse' : ''}`}></span>
-                         </div>
-                      </div>
-                      
-                      <div className="space-y-6 flex-1">
-                         <div className="grid grid-cols-2 gap-4">
-                            <div className={`bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 transition-all ${!isEditingLocation ? 'cursor-pointer' : ''}`}>
-                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Postal Code</p>
-                               {isEditingLocation ? (
-                                 <div className="relative">
-                                   <input ref={postcodeRef} type="text" value={tempLocation.postcode} onChange={(e) => setTempLocation({...tempLocation, postcode: e.target.value})} className="w-full bg-transparent font-black text-lg text-teal-600 outline-none border-b-2 border-teal-500 pb-1" maxLength={6} />
-                                   {isFetchingData && <div className="absolute right-0 top-1 w-4 h-4 border-2 border-teal-200 border-t-teal-600 rounded-full animate-spin"></div>}
-                                 </div>
-                               ) : (
-                                 <p className="text-lg font-black text-slate-800 dark:text-white" onClick={toggleEditMode}>{location.details.postcode}</p>
-                               )}
-                            </div>
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
-                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">District</p>
-                               {isEditingLocation ? (
-                                 <input type="text" value={tempLocation.district} onChange={(e) => setTempLocation({...tempLocation, district: e.target.value})} className="w-full bg-transparent font-black text-lg text-teal-600 outline-none border-b-2 border-teal-500 pb-1" />
-                               ) : (
-                                 <p className="text-lg font-black text-slate-800 dark:text-white truncate" onClick={toggleEditMode}>{location.details.district}</p>
-                               )}
-                            </div>
-                         </div>
-
-                         <div className={`p-5 rounded-3xl border-2 border-dashed transition-all ${isEditingLocation ? 'border-teal-400 bg-teal-50/80 dark:bg-teal-900/40' : 'border-teal-100 bg-teal-50/50 dark:bg-teal-900/20'}`} onClick={() => !isEditingLocation && toggleEditMode()}>
-                            <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest mb-2">Detailed Address</p>
-                            {isEditingLocation ? (
-                              <textarea value={tempLocation.suburb} onChange={(e) => setTempLocation({...tempLocation, suburb: e.target.value})} className="w-full bg-transparent text-sm font-bold text-teal-900 dark:text-teal-100 outline-none border-b-2 border-teal-500 resize-none h-12" />
-                            ) : (
-                              <p className="text-sm font-bold text-teal-900 dark:text-teal-100 leading-relaxed italic truncate">
-                                 {location.details.suburb}, {location.details.state}
-                              </p>
-                            )}
-                         </div>
-
-                         <div className="mt-auto space-y-3">
-                            <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
-                               <span>Live Lat/Lng</span>
-                               <span className="text-teal-600 font-bold">{isEditingLocation ? 'Manual Override' : 'Geo-Sync'}</span>
-                            </div>
-                            <div className="bg-gray-900 text-teal-400 p-3 rounded-xl font-mono text-[10px] text-center border border-gray-800 shadow-inner">
-                               {location.coords[0].toFixed(6)}° N, {location.coords[1].toFixed(6)}° E
-                            </div>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* New Feature: Regional Health Insights */}
-          <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
-             <div className="flex justify-between items-center mb-8">
-                <div>
-                   <h3 className="text-xl font-black uppercase tracking-tighter">Regional Health Insights</h3>
-                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Infrastructure analysis for {location.city}</p>
-                </div>
-                <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${healthInsights.riskLevel === 'LOW' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                   Risk: {healthInsights.riskLevel}
-                </div>
-             </div>
-             
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-3xl border border-blue-100 dark:border-blue-800/50">
-                   <div className="flex items-center gap-3 mb-4">
-                      <span className="text-2xl">🏥</span>
-                      <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Facilities</p>
-                   </div>
-                   <p className="text-3xl font-black text-blue-900 dark:text-blue-100">{healthInsights.hospitalCount}</p>
-                   <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Clinics & Hospitals</p>
-                </div>
-                
-                <div className="p-6 bg-rose-50 dark:bg-rose-900/20 rounded-3xl border border-rose-100 dark:border-rose-800/50">
-                   <div className="flex items-center gap-3 mb-4">
-                      <span className="text-2xl">🚑</span>
-                      <p className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Emergency</p>
-                   </div>
-                   <p className="text-3xl font-black text-rose-900 dark:text-rose-100">{healthInsights.emergencyResponse}</p>
-                   <p className="text-[10px] font-bold text-rose-400 uppercase mt-1">Avg Response Time</p>
-                </div>
-                
-                <div className="p-6 bg-teal-50 dark:bg-teal-900/20 rounded-3xl border border-teal-100 dark:border-teal-800/50">
-                   <div className="flex items-center gap-3 mb-4">
-                      <span className="text-2xl">⭐</span>
-                      <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Rating</p>
-                   </div>
-                   <div className="flex items-baseline gap-1">
-                      <p className="text-3xl font-black text-teal-900 dark:text-teal-100">{healthInsights.coverageRating}</p>
-                      <span className="text-xs font-bold text-teal-500">/10</span>
-                   </div>
-                   <p className="text-[10px] font-bold text-teal-400 uppercase mt-1">Coverage Index</p>
-                </div>
-             </div>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-4">
-             <div className="md:col-span-1 bg-teal-600 rounded-[2rem] p-6 text-white flex flex-col justify-between shadow-lg shadow-teal-200">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Health Score</p>
-                <div className="my-2"><span className="text-5xl font-black">{healthScore}</span><span className="text-lg opacity-50 ml-1">/100</span></div>
-                <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden"><div className="h-full bg-white transition-all duration-1000" style={{width: `${healthScore}%`}}></div></div>
-             </div>
-             <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {vitals.map((vital) => (
-                  <div key={vital.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm transition-transform active:scale-95 cursor-pointer">
-                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">{vital.name}</p>
-                    <p className={`text-xl font-black ${vital.color}`}>{vital.value}<span className="text-[10px] ml-0.5 opacity-50 font-bold">{vital.unit}</span></p>
-                    <div className="flex items-center mt-2"><span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${vital.status === 'normal' ? 'bg-green-50 text-green-600' : 'bg-rose-50 text-rose-600'}`}>{vital.status}</span></div>
+      <div className="grid lg:grid-cols-12 gap-8">
+        
+        {/* 2. Left Section: Vitals & Core Stats */}
+        <div className="lg:col-span-8 space-y-8">
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+             {vitals.map((vital) => (
+               <div key={vital.id} className="bg-white dark:bg-slate-800 p-8 rounded-[3rem] shadow-sm border border-slate-50 dark:border-slate-700 group hover:shadow-2xl hover:-translate-y-2 transition-all duration-500">
+                  <div className="flex justify-between items-start mb-6">
+                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-opacity-10 shadow-inner ${vital.color.replace('text-', 'bg-')}`}>
+                        <svg className={`w-6 h-6 ${vital.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           {vital.id === 'hr' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />}
+                           {vital.id === 'bp' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />}
+                           {vital.id === 'spo2' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />}
+                           {vital.id === 'temp' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />}
+                        </svg>
+                     </div>
+                     <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${vital.status === 'normal' ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {vital.status}
+                     </span>
                   </div>
-                ))}
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{vital.name}</p>
+                  <div className="flex items-baseline gap-2">
+                     <span className="text-4xl font-black text-slate-800 dark:text-white tracking-tighter leading-none">{vital.value}</span>
+                     <span className="text-xs font-bold text-slate-400 uppercase">{vital.unit}</span>
+                  </div>
+               </div>
+             ))}
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+             <div className="bg-white dark:bg-slate-800 rounded-[3.5rem] shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden relative h-[450px] group">
+                <div className="absolute top-8 left-8 z-[20] flex flex-col gap-3 pointer-events-none">
+                   <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl px-6 py-4 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-slate-700">
+                      <h3 className="text-base font-black uppercase tracking-tighter text-teal-600">Geo-Health Matrix</h3>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Live Zone: {location.city}</p>
+                   </div>
+                </div>
+                <div className="h-full w-full z-0 grayscale-[40%] brightness-[0.9] opacity-90 group-hover:opacity-100 transition-all duration-1000 group-hover:scale-105">
+                   <MapContainer style={{ height: '100%', width: '100%' }}>
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <Marker position={location.coords} />
+                      <MapFocus center={location.coords} />
+                   </MapContainer>
+                </div>
+                <div className="absolute bottom-8 left-8 right-8 z-20">
+                   <button 
+                    onClick={() => onNavigate(AppView.DOCTOR_FINDER)} 
+                    className="w-full bg-slate-900 dark:bg-teal-600 text-white py-5 rounded-[1.8rem] font-black uppercase text-xs tracking-[0.3em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all"
+                   >
+                      Search Regional Specialists
+                   </button>
+                </div>
+             </div>
+
+             <div className="bg-white dark:bg-slate-800 p-10 rounded-[3.5rem] shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col">
+                <div className="flex justify-between items-start mb-10">
+                   <div>
+                      <h3 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">Physical Performance</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Daily mobility log & efficiency</p>
+                   </div>
+                   <div className={`w-4 h-4 rounded-full ${isPedometerActive ? 'bg-green-500 animate-ping' : 'bg-slate-200'}`}></div>
+                </div>
+                
+                <div className="flex-1 min-h-[200px]">
+                   <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={historyData}>
+                        <defs>
+                          <linearGradient id="colorSteps" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0d9488" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', fontWeight: 'bold', fontSize: '12px', padding: '12px 20px' }}
+                          cursor={{ stroke: '#0d9488', strokeWidth: 2, strokeDasharray: '6 6' }}
+                        />
+                        <Area type="monotone" dataKey="steps" stroke="#0d9488" strokeWidth={4} fillOpacity={1} fill="url(#colorSteps)" />
+                      </AreaChart>
+                   </ResponsiveContainer>
+                </div>
+
+                <div className="mt-8 flex justify-between items-end">
+                   <div className="space-y-1">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logged Distance</p>
+                      <div className="flex items-baseline gap-1">
+                         <span className="text-5xl font-black tracking-tighter text-slate-800 dark:text-white">{(steps/1000).toFixed(1)}k</span>
+                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Steps</span>
+                      </div>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Target Achievement</p>
+                      <p className="text-2xl font-black text-teal-600 uppercase tracking-tighter">{Math.round(stepProgress)}%</p>
+                   </div>
+                </div>
              </div>
           </div>
         </div>
 
-        <div className="space-y-6">
-           {/* Emergency SOS Card - New Ambulance Feature */}
-           <div className="bg-rose-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-rose-200 dark:shadow-none flex flex-col items-center text-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-              </div>
-              <h3 className="text-xl font-black uppercase tracking-tighter mb-2">Emergency SOS</h3>
-              <p className="text-xs font-bold text-rose-100 mb-6 uppercase tracking-widest opacity-80">Book ambulance instantly for FREE</p>
-              <button 
-                onClick={() => onNavigate(AppView.AMBULANCE)}
-                className="w-full py-4 bg-white text-rose-600 rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] hover:bg-rose-50 transition-all shadow-lg active:scale-95"
-              >
-                Launch Ambulance
-              </button>
-           </div>
-
-           <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between min-h-[300px]">
-              <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-black uppercase tracking-tighter">Med Adherence</h3><span className="text-teal-600 font-black text-lg">{adherence}%</span></div>
-              <div className="h-3 w-full bg-gray-50 rounded-full overflow-hidden mb-8"><div className="h-full bg-teal-500 transition-all duration-1000" style={{width: `${adherence}%`}}></div></div>
-              {nextMed ? (
-                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                   <div className="truncate mr-2"><p className="font-bold text-sm truncate">{nextMed.name}</p><p className="text-[10px] text-teal-600 font-black uppercase tracking-widest mt-1">{nextMed.time} • {nextMed.dosage}</p></div>
-                   <button onClick={() => onUpdateReminders?.(reminders.map(r => r.id === nextMed.id ? {...r, isTakenToday: true} : r))} className="w-8 h-8 bg-teal-600 text-white rounded-lg flex items-center justify-center hover:bg-teal-700 transition-colors shadow-sm">✓</button>
-                </div>
-              ) : <p className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest py-8">All clear ✨</p>}
-           </div>
+        {/* 4. Right Section: Command Sidebar */}
+        <div className="lg:col-span-4 space-y-8">
            
-           <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden group hover:scale-[1.02] transition-transform">
+           <div className="bg-[#0b4d4a] rounded-[3.5rem] p-10 text-white shadow-2xl shadow-teal-100 dark:shadow-none relative overflow-hidden group">
+              <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/5 rounded-full blur-3xl group-hover:scale-150 transition-all duration-1000"></div>
               <div className="relative z-10">
-                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-black uppercase tracking-tighter">Step Tracker</h3>
-                    <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isPedometerActive ? 'bg-green-400 text-white animate-pulse' : 'bg-white/20'}`}>
-                       {isPedometerActive ? 'Live' : 'Active'}
-                    </div>
+                 <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-3">Diagnostic Integrity Score</p>
+                 <div className="flex items-baseline gap-3 mb-10">
+                    <span className="text-8xl font-black tracking-tighter">{healthScore}</span>
+                    <span className="text-2xl font-bold opacity-40">/ 100</span>
                  </div>
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-end">
-                       <span className="text-4xl font-black tracking-tighter">{(steps/1000).toFixed(1)}k</span>
-                       <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">/ {stepGoal/1000}k Goal</span>
+                 
+                 <div className="space-y-8">
+                    <div>
+                       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-3">
+                          <span>Clinical Adherence</span>
+                          <span>{adherence}%</span>
+                       </div>
+                       <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full bg-white shadow-[0_0_20px_rgba(255,255,255,0.7)] transition-all duration-1000" style={{width: `${adherence}%`}}></div>
+                       </div>
                     </div>
-                    <div className="h-2.5 w-full bg-white/20 rounded-full overflow-hidden">
-                       <div className="h-full bg-white transition-all duration-500 shadow-[0_0_10px_white]" style={{width: `${stepProgress}%`}}></div>
-                    </div>
+                    
+                    <button 
+                      onClick={() => onNavigate(AppView.CHAT)}
+                      className="w-full py-5 bg-white text-teal-900 rounded-[1.8rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-teal-50 hover:scale-[1.02] active:scale-95 transition-all"
+                    >
+                       Execute Symptom Analysis
+                    </button>
                  </div>
               </div>
-              <span className="absolute -bottom-4 -right-4 text-9xl opacity-10 select-none pointer-events-none group-hover:rotate-12 transition-transform duration-700">🏃</span>
            </div>
 
-           <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-black uppercase tracking-tighter">Hydration</h3>
-                  <div className="text-blue-500 font-black">{Math.round(waterProgress)}%</div>
-               </div>
-               <div className="relative h-48 bg-blue-50 dark:bg-blue-900/20 rounded-3xl overflow-hidden flex flex-col items-center justify-center mb-6">
-                  <div className="absolute bottom-0 left-0 w-full bg-blue-400/30 transition-all duration-1000" style={{ height: `${waterProgress}%` }}></div>
-                  <div className="relative z-10 text-center">
-                    <span className="text-4xl">💧</span>
-                    <p className="text-2xl font-black text-blue-600 mt-2">{waterIntake}<span className="text-xs uppercase ml-1">ml</span></p>
-                    <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Goal: {waterGoal}ml</p>
+           {/* 5. Hydration & Nutrition Hubs */}
+           <div className="grid grid-cols-1 gap-8">
+              {/* Nutrition Hub */}
+              <div className="bg-white dark:bg-slate-800 p-10 rounded-[3.5rem] shadow-sm border border-slate-50 dark:border-slate-700">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">Metabolic Energy</h3>
+                    <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest">Daily Cap: {calGoal} kcal</p>
                   </div>
-               </div>
-               <div className="flex gap-2">
+                  <div className="w-12 h-12 bg-orange-50 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-2xl shadow-inner">🥗</div>
+                </div>
+                
+                <div className="relative h-24 bg-slate-50 dark:bg-slate-900/40 rounded-[1.8rem] overflow-hidden mb-6 border border-slate-100 dark:border-slate-700">
+                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-1000 ease-out origin-left" style={{ width: `${calProgress}%` }}></div>
+                  <div className="relative h-full flex items-center px-6 justify-between">
+                    <p className="text-2xl font-black text-white mix-blend-difference">{dailyCals} kcal</p>
+                    <p className="text-[10px] font-black text-white mix-blend-difference uppercase tracking-widest">{Math.round(calProgress)}% Consumed</p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => onNavigate(AppView.MEALS)}
+                  className="w-full py-5 bg-orange-600 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest hover:bg-orange-700 transition-all shadow-xl shadow-orange-100 dark:shadow-none transform active:scale-95"
+                >
+                  Log Nutrition Input
+                </button>
+              </div>
+
+              {/* Hydration Hub */}
+              <div className="bg-white dark:bg-slate-800 p-10 rounded-[3.5rem] shadow-sm border border-slate-50 dark:border-slate-700">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none mb-2">Hydration Hub</h3>
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Daily Optimum: {waterGoal}ml</p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-2xl shadow-inner">💧</div>
+                </div>
+                
+                <div className="relative h-56 bg-blue-50/40 dark:bg-blue-900/10 rounded-[2.8rem] overflow-hidden mb-8 border border-blue-50 dark:border-blue-900/30 group">
+                  <div 
+                    className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-blue-600 to-blue-400 transition-all duration-1000 ease-out" 
+                    style={{ height: `${waterProgress}%` }}
+                  >
+                    <div className="absolute top-0 left-0 w-full h-8 bg-white/20 animate-pulse"></div>
+                    <div className="absolute top-0 left-0 w-full h-4 bg-white/10 -mt-4 animate-bounce duration-[2000ms]"></div>
+                  </div>
+                  <div className="relative h-full flex flex-col items-center justify-center">
+                    <p className="text-5xl font-black text-blue-700 dark:text-blue-300 tracking-tighter leading-none">{waterIntake}</p>
+                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.25em] mt-3">Milliliters Consumed</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
                   {[250, 500].map(amt => (
-                    <button key={amt} onClick={() => setWaterIntake(prev => prev + amt)} className="flex-1 py-3 bg-blue-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all shadow-md shadow-blue-100">+{amt}ml</button>
+                    <button 
+                      key={amt} 
+                      onClick={() => setWaterIntake(prev => prev + amt)} 
+                      className="flex-1 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 dark:shadow-none transform active:scale-95"
+                    >
+                      +{amt}ml
+                    </button>
                   ))}
-               </div>
-            </div>
+                </div>
+              </div>
+           </div>
+
+           {/* 6. Medical Bulletin Widget */}
+           <div 
+             onClick={() => onNavigate(AppView.HEALTH_NEWS)}
+             className="bg-slate-900 rounded-[3.5rem] p-10 text-white shadow-2xl relative overflow-hidden group cursor-pointer hover:bg-slate-800 transition-all duration-500"
+           >
+              <div className="relative z-10">
+                 <div className="flex justify-between items-center mb-8">
+                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">🗞️</div>
+                    <span className="bg-teal-500 text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">Intelligence Feed</span>
+                 </div>
+                 <h3 className="text-2xl font-black uppercase tracking-tighter mb-3 leading-tight">Global Medical<br />Bulletin</h3>
+                 <p className="text-xs text-slate-400 font-medium leading-relaxed mb-8 max-w-[240px]">
+                    Real-time monitoring of viral outbreaks and clinical journal breakthroughs.
+                 </p>
+                 <div className="flex items-center gap-3 text-teal-400 font-black text-[10px] uppercase tracking-[0.2em] group-hover:gap-5 transition-all">
+                    <span>Read Full Bulletin</span>
+                    <svg className="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                 </div>
+              </div>
+              <div className="absolute -bottom-16 -right-16 text-[12rem] opacity-[0.03] select-none pointer-events-none group-hover:rotate-12 transition-transform duration-1000 font-black">NEWS</div>
+           </div>
+
         </div>
-      </section>
+      </div>
+
+      {/* 7. Emergency Floating Footer (Mobile Optimzed) */}
+      <div className="md:hidden fixed bottom-8 left-6 right-6 z-50">
+         <button 
+           onClick={() => onNavigate(AppView.AMBULANCE)}
+           className="w-full bg-rose-600 text-white py-6 rounded-[2.2rem] font-black uppercase text-sm tracking-[0.3em] shadow-[0_20px_50px_rgba(225,29,72,0.4)] flex items-center justify-center gap-4 animate-bounce"
+         >
+            <span className="text-xl">🚑</span> Emergency Dispatch
+         </button>
+      </div>
+
     </div>
   );
 };

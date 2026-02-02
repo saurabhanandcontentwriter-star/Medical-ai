@@ -3,15 +3,18 @@ import { GoogleGenAI, GenerateContentResponse, Type, Modality } from "@google/ge
 import { Message, Sender, DoctorSearchResult, Medicine, LabTest, HealthNewsItem, HealthTip, YogaSession } from "../types";
 
 const SYSTEM_INSTRUCTION = `
-You are MedAssist, a supportive and knowledgeable medical AI assistant. 
-Your goal is to help users understand symptoms, explain medical terms, and analyze potential health concerns based on their input.
+You are MedAssist, a supportive and knowledgeable polyglot medical AI assistant. 
+Your goal is to help users understand symptoms, explain medical terms, and analyze potential health concerns.
 
 CRITICAL RULES:
-1. ALWAYS provide a disclaimer that you are an AI, not a doctor, and that your advice does not replace professional medical evaluation.
+1. ALWAYS provide a disclaimer that you are an AI, not a doctor.
 2. If a situation seems life-threatening (chest pain, difficulty breathing, severe bleeding), urge the user to call emergency services immediately.
-3. Be empathetic, clear, and concise. Use markdown for readability.
-4. When analyzing medical reports (images), explain the findings in simple terms but remain objective.
-5. If a specific language is requested, respond strictly in that language.
+3. Be empathetic, clear, and concise. 
+4. FORMATTING RULE: Do NOT use standard bold markdown markers like '**text**'. 
+   Instead, use '### Header' for section titles and '## Header' for main conclusions. 
+   Focus on using clear sections with headers to highlight information. 
+   You may use bullet points (*) for lists.
+5. You are CAPABLE of speaking many languages. You MUST respond strictly in the language requested by the USER SETTING.
 `;
 
 export const sendMessageToGemini = async (
@@ -22,14 +25,23 @@ export const sendMessageToGemini = async (
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const chat = ai.chats.create({
-      model: 'gemini-3-flash-preview',
-      config: {
-        systemInstruction: `${SYSTEM_INSTRUCTION}\n\nIMPORTANT: You must respond in the following language: ${language}.`,
-      },
+    const contents = history.map(msg => ({
+      role: msg.sender === Sender.USER ? 'user' : 'model',
+      parts: [{ text: msg.text }]
+    }));
+
+    contents.push({
+      role: 'user',
+      parts: [{ text: newMessage }]
     });
 
-    const response = await chat.sendMessage({ message: newMessage });
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: contents,
+      config: {
+        systemInstruction: `${SYSTEM_INSTRUCTION}\n\nUSER SETTING: Respond exclusively in ${language}.`,
+      },
+    });
 
     return response.text || "I'm sorry, I couldn't generate a response. Please try again.";
   } catch (error) {
@@ -38,56 +50,41 @@ export const sendMessageToGemini = async (
   }
 };
 
-export const generateDoctorAvatar = async (gender: 'male' | 'female'): Promise<string | null> => {
+export const fetchHealthNews = async (language: string = 'English'): Promise<HealthNewsItem[]> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `A professional, empathetic, and trustworthy ${gender} doctor, wearing a clean modern white clinical coat, professional lighting, photorealistic 4k high quality, neutral clinical background. Looking friendly and directly at the camera.`;
-    
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: [{ parts: [{ text: prompt }] }],
+      model: 'gemini-3-flash-preview',
+      contents: `Get the latest health and medical news updates from India and around the world from today. 
+      PRIORITY: Explicitly look for and include any updates on the Nipah virus outbreak, COVID-19 variants, or monsoon-related health emergencies in India.
+      IMPORTANT: All text fields (title, summary, category, source) MUST be in ${language}.
+      Provide 6-8 news items as structured JSON.`,
       config: {
-        imageConfig: {
-          aspectRatio: "1:1"
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              title: { type: Type.STRING },
+              summary: { type: Type.STRING },
+              source: { type: Type.STRING },
+              url: { type: Type.STRING },
+              date: { type: Type.STRING },
+              category: { type: Type.STRING }
+            },
+            required: ['id', 'title', 'summary', 'source', 'url', 'date', 'category']
+          }
         }
       }
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
+    const text = response.text;
+    return text ? JSON.parse(text) : [];
   } catch (error) {
-    console.error("Error generating doctor avatar:", error);
-    return null;
-  }
-};
-
-export const generateConsultationSummary = async (transcript: string): Promise<string> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Please summarize the following medical consultation transcript into structured doctor's notes. 
-      Include sections for: 
-      1. Chief Complaint/Observations
-      2. Key Discussion Points
-      3. Preliminary Advice (with AI disclaimer)
-      4. Suggested Next Steps.
-      
-      Transcript:
-      ${transcript}`,
-      config: {
-        systemInstruction: "You are a professional medical scribe. Your task is to extract clinical relevance from conversational transcripts. Be concise and professional.",
-      }
-    });
-
-    return response.text || "Could not generate summary.";
-  } catch (error) {
-    console.error("Error generating summary:", error);
-    return "Failed to generate session summary. Please check your connection.";
+    console.error("Error fetching health news:", error);
+    return [];
   }
 };
 
@@ -221,7 +218,6 @@ export const generateYogaStepVideo = async (
 export const generateSpeech = async (text: string, language: string = 'English'): Promise<Uint8Array | null> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Use the language context to prompt the TTS model for natural tone in that specific Indian language
     const prompt = `Speak clearly and empathetic in ${language}: ${text}`;
 
     const response = await ai.models.generateContent({
@@ -231,7 +227,6 @@ export const generateSpeech = async (text: string, language: string = 'English')
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            // Selecting Kore for general versatility across Indian language tonalities
             prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
@@ -277,6 +272,28 @@ export async function decodeAudioData(
   }
   return buffer;
 }
+
+export const generateConsultationSummary = async (transcript: string): Promise<string> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `As a professional medical assistant, please provide a structured clinical summary of the following consultation transcript. 
+      Include sections for: Chief Complaint, Key Discussion Points, and Suggested Next Steps or Follow-up Care.
+      
+      TRANSCRIPT:
+      ${transcript}`,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION
+      }
+    });
+
+    return response.text || "Summary could not be generated at this time.";
+  } catch (error) {
+    console.error("Error generating consultation summary:", error);
+    return "Failed to process the consultation summary. Please review the conversation logs manually.";
+  }
+};
 
 export const analyzeMedicalImage = async (
   base64Image: string,
@@ -436,43 +453,6 @@ export const searchLabTests = async (query: string): Promise<LabTest[]> => {
     return text ? JSON.parse(text) : [];
   } catch (error) {
     console.error("Error searching lab tests:", error);
-    return [];
-  }
-};
-
-export const fetchHealthNews = async (language: string = 'English'): Promise<HealthNewsItem[]> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Get the latest health and medical news updates from India and around the world from today. 
-      IMPORTANT: All text fields (title, summary, category, source) MUST be in ${language}.
-      Provide 6-8 news items as structured JSON.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              title: { type: Type.STRING },
-              summary: { type: Type.STRING },
-              source: { type: Type.STRING },
-              url: { type: Type.STRING },
-              date: { type: Type.STRING },
-              category: { type: Type.STRING }
-            },
-            required: ['id', 'title', 'summary', 'source', 'url', 'date', 'category']
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    return text ? JSON.parse(text) : [];
-  } catch (error) {
-    console.error("Error fetching health news:", error);
     return [];
   }
 };

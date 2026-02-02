@@ -58,6 +58,7 @@ export enum AppView {
   HEALTH_NEWS = 'HEALTH_NEWS',
   HEALTH_TIPS = 'HEALTH_TIPS',
   YOGA = 'YOGA',
+  MEALS = 'MEALS',
   TRACKING = 'TRACKING',
   PROFILE = 'PROFILE',
   ADMIN = 'ADMIN',
@@ -66,6 +67,17 @@ export enum AppView {
   BLOG = 'BLOG',
   AMBULANCE = 'AMBULANCE',
   MEDICAL_COLLEGES = 'MEDICAL_COLLEGES'
+}
+
+export interface MealEntry {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  time: string;
+  type: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
 }
 
 export interface MedicationReminder {
@@ -199,4 +211,13 @@ export interface MedicalCollege {
   location: { lat: number; lng: number };
   description: string;
   website: string;
+  about: {
+    departments: string[];
+    facilities: string[];
+    contact: string;
+    fees?: string;
+    neetCutoff?: string;
+    affiliation?: string;
+    beds?: string;
+  };
 }

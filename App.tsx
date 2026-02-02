@@ -10,6 +10,7 @@ import LabTestBooking from './components/LabTestBooking';
 import HealthNews from './components/HealthNews';
 import HealthTips from './components/HealthTips';
 import YogaSessions from './components/YogaSessions';
+import MealTracker from './components/MealTracker';
 import Profile from './components/Profile';
 import OrderTracking from './components/OrderTracking';
 import AdminPanel from './components/AdminPanel';
@@ -23,7 +24,6 @@ import AmbulanceBooking from './components/AmbulanceBooking';
 import MedicalColleges from './components/MedicalColleges';
 import { AppView, AppNotification, Message, Sender, OrderItem, UserProfile, MedicationReminder, Language, SUPPORTED_LANGUAGES } from './types';
 
-// Use default export function to ensure compatibility with index.tsx imports
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('medassist_user');
@@ -32,7 +32,6 @@ export default function App() {
 
   const [showWelcome, setShowWelcome] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(() => {
     const saved = localStorage.getItem('medassist_lang');
     return saved ? JSON.parse(saved) : SUPPORTED_LANGUAGES[0];
@@ -59,7 +58,6 @@ export default function App() {
     localStorage.setItem('medassist_lang', JSON.stringify(selectedLanguage));
   }, [selectedLanguage]);
 
-  // Fullscreen listener
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFsChange);
@@ -78,7 +76,7 @@ export default function App() {
     window.location.reload();
   };
 
-  const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
+  const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD); 
   const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
   const [adminPin, setAdminPin] = useState('');
@@ -106,14 +104,28 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   
-  const [chatMessages, setChatMessages] = useState<Message[]>([
-    {
-      id: 'init',
-      text: "Hi! I'm your MedAssist helper. Need help finding a doctor or checking a quick symptom?",
-      sender: Sender.BOT,
-      timestamp: new Date()
+  const getLocalizedInitialMessage = (lang: string) => {
+    switch (lang) {
+      case 'Hindi': return "नमस्ते! मैं आपका मेडअसिस्ट सहायक हूं। क्या आपको डॉक्टर खोजने या लक्षणों की जांच करने में मदद चाहिए?";
+      case 'Bengali': return "হ্যালো! আমি আপনার মেডঅ্যাসিস্ট সহকারী। আপনার কি ডাক্তার খুঁজে পেতে বা লক্ষণগুলি পরীক্ষা করতে সাহায্যের প্রয়োজন?";
+      default: return "Hi! I'm your MedAssist helper. Need help finding a doctor or checking a quick symptom?";
     }
-  ]);
+  };
+
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    if (chatMessages.length === 0) {
+      setChatMessages([
+        {
+          id: 'init',
+          text: getLocalizedInitialMessage(selectedLanguage.code),
+          sender: Sender.BOT,
+          timestamp: new Date()
+        }
+      ]);
+    }
+  }, [selectedLanguage]);
 
   const addChatBotMessage = (text: string) => {
     const newMsg: Message = {
@@ -260,8 +272,8 @@ export default function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addNotification('Ambulance Dispatched', `A ${type} is en-route to your location. Stay on the line if the driver calls.`, 'alert');
-    addChatBotMessage(`🚨 Emergency dispatch confirmed! A ${type} is on its way. Please stay calm and keep your phone line clear.`);
+    addNotification('Ambulance Dispatched', `A ${type} is en-route to your location.`, 'alert');
+    addChatBotMessage(`🚨 Emergency dispatch confirmed! A ${type} is on its way.`);
     setTimeout(() => setCurrentView(AppView.TRACKING), 1000);
   };
 
@@ -281,8 +293,7 @@ export default function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addNotification('Appointment Confirmed', `Your visit to ${doctorName} is set for ${date} at ${time}.`, 'order');
-    addChatBotMessage(`📅 Appointment confirmed with ${doctorName} for ${date} at ${time}. A confirmation email has been sent to your registered address.`);
+    addNotification('Appointment Confirmed', `Your visit to ${doctorName} is set for ${date}.`, 'order');
     setCurrentView(AppView.TRACKING);
   };
 
@@ -303,8 +314,7 @@ export default function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addNotification('Medicine Order Placed', `We have received your order for ${itemNames.length} items.`, 'order');
-    addChatBotMessage(`🛒 Order placed successfully! Your health items (${itemNames.join(', ')}) will be delivered soon. Receipt sent to your email.`);
+    addNotification('Medicine Order Placed', `Received order for ${itemNames.length} items.`, 'order');
     setCurrentView(AppView.TRACKING);
   };
 
@@ -326,8 +336,7 @@ export default function App() {
       ]
     };
     setOrders(prev => [newOrder, ...prev]);
-    addNotification('Lab Test Scheduled', `Your ${testName} is scheduled for collection on ${date}.`, 'order');
-    addChatBotMessage(`🔬 Lab test "${testName}" booked for ${date}. Our technician will contact you for home collection. Check your email for the detailed instructions.`);
+    addNotification('Lab Test Scheduled', `Your ${testName} is scheduled for ${date}.`, 'order');
     setCurrentView(AppView.TRACKING);
   };
 
@@ -358,7 +367,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-gray-900 transition-colors duration-200 text-gray-900 dark:text-gray-100">
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 dark:bg-gray-950 transition-colors duration-200 text-gray-900 dark:text-white">
       {showWelcome && (
         <WelcomeModal 
           userName={user.name.split(' ')[0]} 
@@ -366,27 +375,14 @@ export default function App() {
         />
       )}
 
-      {/* Top Utility Layer */}
       <div className="fixed top-4 right-4 z-[60] flex items-center gap-3">
-        {/* Utility Bar from User Screenshot */}
-        <div className="flex items-center gap-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 transition-all">
-          <button 
-            onClick={() => setIsLanguageModalOpen(true)}
-            className="p-1.5 text-teal-600 hover:scale-110 transition-transform flex items-center gap-2"
-            title="Switch Language"
-          >
-            <span className="text-sm font-black uppercase tracking-tighter">{selectedLanguage.code.substring(0, 2)}</span>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
-          </button>
-
-          <div className="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
-
+        <div className="flex items-center gap-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 transition-all">
           <button 
             onClick={() => setCurrentView(AppView.DASHBOARD)}
             className="p-1.5 text-gray-400 hover:text-teal-600 transition-colors"
-            title="Layout View"
+            title="Dashboard Home"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM9 20h6" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16" /></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           </button>
           
           <div className="w-px h-4 bg-gray-200 dark:bg-gray-700"></div>
@@ -416,21 +412,20 @@ export default function App() {
           </button>
         </div>
 
-        {/* Notifications */}
         <div className="relative">
-          <button onClick={() => { setIsNotificationOpen(!isNotificationOpen); if (!isNotificationOpen) markAllRead(); }} className="p-2.5 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full shadow-lg hover:bg-gray-50 border border-gray-100 dark:border-gray-700 transition-all">
+          <button onClick={() => { setIsNotificationOpen(!isNotificationOpen); if (!isNotificationOpen) markAllRead(); }} className="p-2.5 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 rounded-full shadow-lg hover:bg-gray-50 border border-gray-100 dark:border-gray-800 transition-all">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
             {unreadCount > 0 && <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white transform translate-x-1 -translate-y-1">{unreadCount}</span>}
           </button>
           {isNotificationOpen && (
-            <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2">
-              <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
+            <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in slide-in-from-top-2">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center">
                 <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
                 <span className="text-xs text-gray-500">{notifications.length} Total</span>
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {notifications.length === 0 ? <div className="p-8 text-center text-gray-400 text-sm">No notifications yet.</div> : notifications.map(notif => (
-                    <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}>
+                    <div key={notif.id} className={`p-4 border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 transition-colors ${notif.read ? 'opacity-70' : 'bg-blue-50/30'}`}>
                       <div className="flex gap-3">
                         <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${notif.type === 'order' ? 'bg-green-500' : 'bg-teal-500'}`}></div>
                         <div>
@@ -447,49 +442,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* Language Hub Modal */}
-      {isLanguageModalOpen && (
-        <div className="fixed inset-0 z-[200] bg-teal-950/80 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-300">
-           <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl animate-in zoom-in-95 duration-500 border border-teal-500/20">
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                   <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Language Hub</h2>
-                   <p className="text-sm text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest mt-1">Select your preferred Indian language</p>
-                </div>
-                <button onClick={() => setIsLanguageModalOpen(false)} className="bg-gray-100 dark:bg-gray-700 p-3 rounded-full text-gray-400 hover:text-rose-500 transition-colors">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <button 
-                    key={lang.code}
-                    onClick={() => { setSelectedLanguage(lang); setIsLanguageModalOpen(false); }}
-                    className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center gap-2 group ${selectedLanguage.code === lang.code ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30' : 'border-gray-50 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:border-teal-200'}`}
-                  >
-                    <span className={`text-2xl font-black transition-transform group-hover:scale-110 ${selectedLanguage.code === lang.code ? 'text-teal-600 dark:text-teal-400' : 'text-gray-400'}`}>{lang.native}</span>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 group-hover:text-teal-600">{lang.name}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="bg-teal-50 dark:bg-teal-900/10 p-6 rounded-3xl border-2 border-dashed border-teal-200 dark:border-teal-800">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-white dark:bg-gray-700 rounded-2xl flex items-center justify-center text-xl shadow-sm">🗣️</div>
-                  <div>
-                    <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest mb-1">AI Voice Feature</p>
-                    <p className="text-xs font-bold text-teal-800 dark:text-teal-200 leading-relaxed italic">The AI will now listen, speak, and write in {selectedLanguage.native} during all health sessions.</p>
-                  </div>
-                </div>
-              </div>
-           </div>
-        </div>
-      )}
-
       {dueMedication && (
         <div className="fixed inset-0 z-[1000] bg-teal-950/90 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95 duration-500 border border-teal-500/20 text-center relative overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95 duration-500 border border-teal-500/20 text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-2 bg-teal-500 animate-pulse"></div>
             <div className="w-24 h-24 bg-teal-50 dark:bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-8 relative">
                <span className="text-5xl animate-bounce">💊</span>
@@ -497,13 +452,13 @@ export default function App() {
             </div>
             <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-2">Prescription Due</h2>
             <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-xs mb-8">Scheduled at {dueMedication.time}</p>
-            <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 mb-10">
+            <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 mb-10">
                <h3 className="text-xl font-black text-teal-600 dark:text-teal-400 uppercase tracking-tighter">{dueMedication.name}</h3>
                <p className="text-sm font-bold text-gray-600 dark:text-gray-300 mt-1">{dueMedication.dosage}</p>
             </div>
             <div className="flex flex-col gap-3">
               <button onClick={handleTakeDueMed} className="w-full bg-teal-600 text-white py-5 rounded-2xl font-black uppercase text-sm tracking-[0.2em] shadow-xl hover:bg-teal-700 transition-all transform active:scale-95">Mark as Taken</button>
-              <button onClick={() => setDueMedication(null)} className="w-full py-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-black uppercase text-[10px] tracking-widest transition-colors">Snooze for 5 Mins</button>
+              <button onClick={() => setDueMedication(null)} className="w-full py-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-black uppercase text-[10px] tracking-widest transition-colors">Snooze</button>
             </div>
           </div>
         </div>
@@ -511,20 +466,18 @@ export default function App() {
 
       {isAdminAuthOpen && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className={`bg-white dark:bg-gray-800 rounded-[2.5rem] w-full max-sm p-10 shadow-2xl transition-transform duration-300 ${pinError ? 'animate-bounce' : ''}`}>
+          <div className={`bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-sm p-10 shadow-2xl transition-transform duration-300 ${pinError ? 'animate-bounce' : ''}`}>
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-teal-100 dark:bg-teal-900/30 rounded-2xl flex items-center justify-center text-teal-600 dark:text-teal-400 mx-auto mb-4">
                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
               </div>
               <h2 className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white">Admin Entry</h2>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Authorized Personnel Only</p>
             </div>
             <div className="flex justify-center gap-4 mb-10">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className={`w-4 h-4 rounded-full transition-all duration-300 ${adminPin.length >= i ? 'bg-teal-600 scale-125' : 'bg-gray-200 dark:bg-gray-700'}`}></div>
+                <div key={i} className={`w-4 h-4 rounded-full transition-all duration-300 ${adminPin.length >= i ? 'bg-teal-600 scale-125' : 'bg-gray-200 dark:bg-gray-800'}`}></div>
               ))}
             </div>
-            {/* Fixed syntax error in Admin PIN pad layout */}
             <div className="grid grid-cols-3 gap-4">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'X'].map((key) => (
                 <button
@@ -534,7 +487,7 @@ export default function App() {
                     else if (key === 'X') setIsAdminAuthOpen(false);
                     else handlePinClick(key);
                   }}
-                  className="h-16 rounded-2xl font-black text-xl flex items-center justify-center transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="h-16 rounded-2xl font-black text-xl flex items-center justify-center transition-all active:scale-95 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   {key === 'X' ? (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,32 +497,40 @@ export default function App() {
                 </button>
               ))}
             </div>
-            {pinError && <p className="text-center mt-6 text-rose-500 font-bold text-xs uppercase tracking-widest animate-pulse">Incorrect Access Key</p>}
           </div>
         </div>
       )}
 
       {showDisclaimer && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-md w-full p-8 shadow-2xl transition-colors">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl max-w-md w-full p-8 shadow-2xl transition-colors border border-gray-100 dark:border-gray-800">
             <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mb-4">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Medical Disclaimer</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">MedAssist AI is a demonstration tool. The information provided does not constitute medical advice.</p>
-            <button onClick={() => setShowDisclaimer(false)} className="w-full bg-gray-900 dark:bg-gray-700 text-white py-3.5 rounded-xl font-medium hover:bg-gray-800 transition-colors">I Understand & Agree</button>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">MedAssist AI is a demonstration tool. AI suggestions do not replace professional advice.</p>
+            <button onClick={() => setShowDisclaimer(false)} className="w-full bg-teal-600 text-white py-3.5 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-teal-700 transition-all">Agree & Continue</button>
           </div>
         </div>
       )}
 
-      <Navigation currentView={currentView} setView={setCurrentView} onLogout={handleLogout} isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} onAdminRequest={() => setIsAdminAuthOpen(true)} />
+      <Navigation 
+        currentView={currentView} 
+        setView={setCurrentView} 
+        onLogout={handleLogout} 
+        isDarkMode={isDarkMode} 
+        toggleDarkMode={toggleDarkMode} 
+        onAdminRequest={() => setIsAdminAuthOpen(true)}
+        selectedLanguage={selectedLanguage}
+        onLanguageChange={setSelectedLanguage}
+      />
 
       <main className="flex-1 overflow-hidden h-screen overflow-y-auto relative flex flex-col pt-16 md:pt-0">
         <div className="flex-1">
           {currentView === AppView.DASHBOARD && <Dashboard orders={orders} onNavigate={setCurrentView} reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
           {currentView === AppView.MED_REMINDERS && <MedicationReminders reminders={reminders} onUpdateReminders={handleUpdateReminder} />}
           {currentView === AppView.VIDEO_CONSULT && <VideoConsultation />}
-          {currentView === AppView.CHAT && <SymptomChat chatMessages={chatMessages} setChatMessages={setChatMessages} language={selectedLanguage} />}
+          {currentView === AppView.CHAT && <SymptomChat chatMessages={chatMessages} setChatMessages={setChatMessages} language={selectedLanguage} onLanguageChange={setSelectedLanguage} />}
           {currentView === AppView.ANALYZER && <ReportAnalyzer />}
           {currentView === AppView.DOCTOR_FINDER && <DoctorFinder onBookAppointment={handleDoctorAppointment} />}
           {currentView === AppView.ORDER_MEDICINE && <MedicineOrder onOrderComplete={handleMedicineOrderComplete} />}
@@ -580,12 +541,13 @@ export default function App() {
           {currentView === AppView.BLOG && <HealthBlog />}
           {currentView === AppView.HEALTH_TIPS && <HealthTips />}
           {currentView === AppView.YOGA && <YogaSessions />}
+          {currentView === AppView.MEALS && <MealTracker />}
           {currentView === AppView.TRACKING && <OrderTracking orders={orders} />}
           {currentView === AppView.PROFILE && <Profile user={{...user!, totalTimeSpent}} />}
           {currentView === AppView.ADMIN && <AdminPanel />}
         </div>
-        <footer className="p-6 mt-auto border-t border-gray-100 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-gray-400 font-medium">© 2024 MedAssist AI. For educational purposes only.</p>
+        <footer className="p-6 mt-auto border-t border-gray-100 dark:border-gray-900 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">© 2024 MedAssist AI Institutional Portal</p>
         </footer>
         {currentView !== AppView.CHAT && currentView !== AppView.VIDEO_CONSULT && (
           <FloatingChatbot 
